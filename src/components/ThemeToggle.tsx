@@ -1,0 +1,16 @@
+'use client';
+
+import { IconButton, Tooltip } from '@mui/material';
+import { Brightness4, Brightness7 } from '@mui/icons-material';
+import { useColorScheme } from '@mui/material/styles';
+
+export default function ThemeToggle() {
+  const { mode, setMode } = useColorScheme();
+  return (
+    <Tooltip title={mode === 'dark' ? 'Açık tema' : 'Koyu tema'}>
+      <IconButton onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')} color="inherit">
+        {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+      </IconButton>
+    </Tooltip>
+  );
+}
