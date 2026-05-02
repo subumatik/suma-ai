@@ -40,11 +40,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
   const drawerWidth = isMobile ? DRAWER_WIDTH : (collapsed ? DRAWER_COLLAPSED : DRAWER_WIDTH);
 
-  const notifications = [
-    { id: 1, text: 'Yeni analiz tamamlandı: Hasta #A7B2C1', time: '5 dk önce', read: false },
-    { id: 2, text: 'Dr. Matik bir raporu onayladı', time: '1 saat önce', read: false },
-    { id: 3, text: 'Sistem bakımı: 03:00', time: '3 saat önce', read: true },
-  ];
+  const [notifications, setNotifications] = useState([
+    { id: 1, text: 'Yeni analiz tamamlandı: Hasta #A7B2C1', time: '5 dk önce', read: false, path: '/analiz/123e4567-e89b-12d3-a456-426614174000' as string | null },
+    { id: 2, text: 'Dr. Matik bir raporu onayladı', time: '1 saat önce', read: false, path: '/raporlar' as string | null },
+    { id: 3, text: 'Sistem bakımı: 03:00', time: '3 saat önce', read: true, path: null as string | null },
+  ]);
+
+  const handleNotifClick = (id: number, path: string | null) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setNotifAnchorEl(null);
+    if (path) {
+      router.push(path);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -148,13 +156,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {notifications.map((n) => (
                 <MenuItem
                   key={n.id}
-                  onClick={() => setNotifAnchorEl(null)}
+                  onClick={() => handleNotifClick(n.id, n.path)}
                   sx={{
                     py: 1.5,
                     px: 2,
                     bgcolor: n.read ? 'inherit' : 'action.hover',
                     borderLeft: 3,
                     borderColor: n.read ? 'transparent' : 'primary.main',
+                    cursor: n.path ? 'pointer' : 'default',
                   }}
                 >
                   <Box sx={{ flex: 1 }}>
