@@ -71,6 +71,7 @@ export default function NewAnalysisClient({ patients, userId }: { patients: Pati
         image_url: imageUrl || 'pending',
         status: 'PENDING',
         progress: 0,
+        created_by: userId,
       })
       .select()
       .single();

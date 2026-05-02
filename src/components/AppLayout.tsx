@@ -10,7 +10,7 @@ import {
 import {
   Dashboard, People, AddCircle, Assignment, Settings,
   Logout, Menu as MenuIcon, ChevronLeft, Notifications, Science,
-  Chat as ChatIcon, PhotoLibrary,
+  Chat as ChatIcon, PhotoLibrary, AdminPanelSettings,
 } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
 import ThemeToggle from './ThemeToggle';
@@ -19,7 +19,7 @@ import { useAuth } from './AuthProvider';
 const DRAWER_WIDTH = 260;
 const DRAWER_COLLAPSED = 72;
 
-const navItems = [
+const baseNavItems = [
   { label: 'Dashboard', path: '/', icon: <Dashboard /> },
   { label: 'Hasta Listesi', path: '/patients', icon: <People /> },
   { label: 'Yeni Analiz', path: '/analiz/yeni', icon: <AddCircle /> },
@@ -29,17 +29,23 @@ const navItems = [
   { label: 'Ayarlar', path: '/ayarlar', icon: <Settings /> },
 ];
 
+const adminNavItem = { label: 'Admin', path: '/admin', icon: <AdminPanelSettings /> };
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const { user: authUser } = useAuth();
+  const { user: authUser, role } = useAuth();
   const isMobile = useMediaQuery('(max-width: 960px)');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
   const drawerWidth = isMobile ? DRAWER_WIDTH : (collapsed ? DRAWER_COLLAPSED : DRAWER_WIDTH);
+
+  const navItems = role === 'admin'
+    ? [baseNavItems[0], adminNavItem, ...baseNavItems.slice(1)]
+    : baseNavItems;
 
   const [notifications, setNotifications] = useState([
     { id: 1, text: 'Yeni analiz tamamlandı: Hasta #A7B2C1', time: '5 dk önce', read: false, path: '/analiz/123e4567-e89b-12d3-a456-426614174000' as string | null },

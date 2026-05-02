@@ -37,6 +37,7 @@ export default function PatientsClient({ patients, userId }: { patients: Patient
       age: age ? parseInt(age) : null,
       gender: gender || null,
       notes: notes || null,
+      created_by: userId,
     });
     setLoading(false);
     if (!error) {
