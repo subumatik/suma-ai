@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box, Typography, Card, CardContent, Button, Stepper, Step, StepLabel,
   TextField, FormControl, InputLabel, Select, MenuItem, Chip, Alert,
-  Grid, Slider, FormControlLabel, Checkbox,
+  Grid, Slider, FormControlLabel, Checkbox, Divider,
 } from '@mui/material';
-import { CloudUpload, NavigateNext, NavigateBefore, Science } from '@mui/icons-material';
+import { CloudUpload, NavigateNext, NavigateBefore, Science, Delete } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
 import { invalidateDashboardCache, invalidatePatientListCache } from '@/lib/upstash/cache-actions';
 
@@ -29,6 +29,9 @@ export default function NewAnalysisClient({ patients, userId }: { patients: Pati
   const [activeStep, setActiveStep] = useState(preselectedPatient ? 1 : 0);
   const [selectedPatient, setSelectedPatient] = useState(preselectedPatient ?? '');
   const [imageUrl, setImageUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -108,6 +111,50 @@ export default function NewAnalysisClient({ patients, userId }: { patients: Pati
 
   const selectedPatientData = patients.find((p) => p.id === selectedPatient);
 
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Lütfen bir görsel dosyası seçin (JPEG, PNG, WEBP)');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Dosya boyutu 10MB\'dan küçük olmalıdır');
+      return;
+    }
+    setError('');
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('path', `analyses/${Date.now()}-${selectedFile.name}`);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Yükleme başarısız');
+      setImageUrl(data.url);
+    } catch (err: any) {
+      setError(err.message ?? 'Yükleme başarısız');
+    }
+    setUploading(false);
+  };
+
+  const clearImage = () => {
+    setImageUrl('');
+    setPreviewUrl('');
+    setSelectedFile(null);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  };
+
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>Yeni Analiz</Typography>
@@ -150,15 +197,81 @@ export default function NewAnalysisClient({ patients, userId }: { patients: Pati
         <Card>
           <CardContent sx={{ p: 4 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Görüntü Yükle</Typography>
+
+            {/* Drag & drop area */}
+            {!imageUrl && !previewUrl && (
+              <Box
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                sx={{
+                  border: '2px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 3,
+                  p: 4,
+                  textAlign: 'center',
+                  bgcolor: 'action.hover',
+                  cursor: 'pointer',
+                  transition: '0.2s',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'action.selected' },
+                }}
+                onClick={() => document.getElementById('image-upload')?.click()}
+              >
+                <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  Görsel sürükleyin veya tıklayın
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  JPEG, PNG, WEBP — max 10MB
+                </Typography>
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                />
+              </Box>
+            )}
+
+            {/* Preview + upload controls */}
+            {previewUrl && !imageUrl && (
+              <Box sx={{ mt: 2 }}>
+                <Box component="img" src={previewUrl} sx={{ maxHeight: 300, borderRadius: 2, width: '100%', objectFit: 'cover' }} />
+                <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                  <Button variant="contained" onClick={handleUpload} disabled={uploading} startIcon={<CloudUpload />}>
+                    {uploading ? 'Yükleniyor...' : 'Yükle'}
+                  </Button>
+                  <Button variant="outlined" color="error" onClick={clearImage} startIcon={<Delete />}>
+                    Kaldır
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* Uploaded image display */}
+            {imageUrl && (
+              <Box sx={{ mt: 2 }}>
+                <Box component="img" src={imageUrl} sx={{ maxHeight: 300, borderRadius: 2, width: '100%', objectFit: 'cover' }} />
+                <Alert severity="success" sx={{ mt: 1 }}>Görsel yüklendi.</Alert>
+                <Button size="small" color="error" onClick={clearImage} startIcon={<Delete />} sx={{ mt: 1 }}>
+                  Kaldır ve yeniden yükle
+                </Button>
+              </Box>
+            )}
+
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', px: 1 }}>veya</Typography>
+            </Divider>
+
             <TextField
               fullWidth
-              label="Görüntü URL"
+              label="Görüntü URL'si girin"
               placeholder="https://..."
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              helperText="Şimdilik görüntü URL'si girin. Cloudflare R2 entegrasyonu yakında."
+              helperText="Doğrudan URL ile de görsel ekleyebilirsiniz."
             />
-            {imageUrl && (
+            {imageUrl && !previewUrl && (
               <Box component="img" src={imageUrl} sx={{ mt: 2, maxHeight: 300, borderRadius: 2, width: '100%', objectFit: 'cover' }} />
             )}
           </CardContent>

@@ -5,7 +5,7 @@ import {
   Box, Typography, Card, CardContent, Avatar, Chip, Grid, Button, Divider,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from '@mui/material';
-import { Edit, ArrowBack, Science } from '@mui/icons-material';
+import { Edit, ArrowBack, Science, Image as ImageIcon } from '@mui/icons-material';
 
 interface AnalysisResult {
   mite_count: number | null;
@@ -101,6 +101,7 @@ export default function PatientDetailClient({ patient, analyses }: { patient: Pa
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'action.hover' }}>
+                      <TableCell>Görsel</TableCell>
                       <TableCell>Tarih</TableCell>
                       <TableCell>Durum</TableCell>
                       <TableCell>Akar Sayısı</TableCell>
@@ -113,6 +114,19 @@ export default function PatientDetailClient({ patient, analyses }: { patient: Pa
                       const result = a.analysis_results?.[0];
                       return (
                         <TableRow key={a.id} hover sx={{ cursor: 'pointer' }} onClick={() => router.push(`/analiz/${a.id}`)}>
+                          <TableCell>
+                            {a.image_url && a.image_url !== 'pending' ? (
+                              <Box
+                                component="img"
+                                src={a.image_url}
+                                sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <Box sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <ImageIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                              </Box>
+                            )}
+                          </TableCell>
                           <TableCell>{new Date(a.created_at).toLocaleDateString('tr-TR')}</TableCell>
                           <TableCell>
                             <Chip
@@ -131,7 +145,7 @@ export default function PatientDetailClient({ patient, analyses }: { patient: Pa
                     })}
                     {analyses.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                        <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                           <Typography variant="body2" sx={{ color: 'text.secondary' }}>Henüz analiz bulunmuyor.</Typography>
                         </TableCell>
                       </TableRow>

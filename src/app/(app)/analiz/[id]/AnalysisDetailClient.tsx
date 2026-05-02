@@ -107,6 +107,39 @@ export default function AnalysisDetailClient({ analysis }: { analysis: AnalysisD
         </CardContent>
       </Card>
 
+      {/* Source Image */}
+      {analysis.image_url && analysis.image_url !== 'pending' && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Kaynak Görsel</Typography>
+            <Box
+              component="img"
+              src={analysis.image_url}
+              alt="Analiz görseli"
+              sx={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 2, bgcolor: 'background.default' }}
+            />
+          </CardContent>
+        </Card>
+      )}
+      {analysis.image_url === 'pending' && (
+        <Alert severity="info" sx={{ mb: 3 }}>Görsel henüz yüklenmemiş.</Alert>
+      )}
+
+      {/* Grad-CAM */}
+      {result?.gradcam_url && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Grad-CAM Isı Haritası</Typography>
+            <Box
+              component="img"
+              src={result.gradcam_url}
+              alt="Grad-CAM"
+              sx={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 2, bgcolor: 'background.default' }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {analysis.status === 'COMPLETED' && result && (
         <>
           <Grid container spacing={3} sx={{ mb: 3 }}>

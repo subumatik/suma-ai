@@ -10,7 +10,7 @@ import {
 import {
   Dashboard, People, AddCircle, Assignment, Settings,
   Logout, Menu as MenuIcon, ChevronLeft, Notifications, Science,
-  Chat as ChatIcon,
+  Chat as ChatIcon, PhotoLibrary,
 } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
 import ThemeToggle from './ThemeToggle';
@@ -24,6 +24,7 @@ const navItems = [
   { label: 'Hasta Listesi', path: '/patients', icon: <People /> },
   { label: 'Yeni Analiz', path: '/analiz/yeni', icon: <AddCircle /> },
   { label: 'AI Sohbet', path: '/chat', icon: <ChatIcon /> },
+  { label: 'Galeri', path: '/galeri', icon: <PhotoLibrary /> },
   { label: 'Raporlar', path: '/raporlar', icon: <Assignment /> },
   { label: 'Ayarlar', path: '/ayarlar', icon: <Settings /> },
 ];
