@@ -3,7 +3,9 @@
 import { createTheme } from '@mui/material/styles';
 
 export const theme = createTheme({
-  cssVariables: true,
+  cssVariables: {
+    colorSchemeSelector: 'class',
+  },
   colorSchemes: {
     dark: {
       palette: {

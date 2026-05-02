@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Box, Card, CardContent, TextField, Button, Typography, IconButton, InputAdornment, Alert, Fade } from '@mui/material';
@@ -9,6 +9,14 @@ import { Visibility, VisibilityOff, Science } from '@mui/icons-material';
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        router.push('/dashboard');
+      }
+    });
+  }, [router, supabase]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +35,7 @@ export default function LoginPage() {
     if (signInError) {
       setError(signInError.message === 'Invalid login credentials' ? 'E-posta veya şifre hatalı' : signInError.message);
     } else {
-      router.push('/');
+      router.push('/dashboard');
       router.refresh();
     }
   };

@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  id         String   @id @db.Uuid
+  full_name  String?
+  clinic_name String?
+  role       String   @default("doctor")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  patients    Patient[]
+  analyses    Analysis[]
+  auditLogs   AuditLog[]
+
+  @@map("profiles")
+}
+
+model Patient {
+  id              String   @id @default(uuid()) @db.Uuid
+  anonymous_hash  String   @unique
+  age             Int?
+  gender          String?
+  notes           String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  created_by      String   @db.Uuid
+
+  creator     Profile     @relation(fields: [created_by], references: [id])
+  analyses    Analysis[]
+  embeddings  Embedding[]
+
+  @@map("patients")
+}
+
+model Analysis {
+  id              String        @id @default(uuid()) @db.Uuid
+  patient_id      String        @db.Uuid
+  image_url       String
+  status          AnalysisStatus @default(PENDING)
+  progress        Int           @default(0)
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
+  created_by      String        @db.Uuid
+
+  patient         Patient       @relation(fields: [patient_id], references: [id])
+  creator         Profile       @relation(fields: [created_by], references: [id])
+  clinicalForm    ClinicalForm?
+  result          AnalysisResult?
+  report          Report?
+  feedback        DoctorFeedback?
+  embeddings      Embedding[]
+
+  @@map("analyses")
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("analysis_status")
+}
+
+model ClinicalForm {
+  id                    String   @id @default(uuid()) @db.Uuid
+  analysis_id           String   @unique @db.Uuid
+  age                   Int?
+  gender                String?
+  symptom_duration_days Int?
+  itching_severity      Int?     @db.SmallInt
+  redness_score         Int?     @db.SmallInt
+  scaling_present       Boolean  @default(false)
+  previous_treatment    String?
+  immune_status         String?
+  skin_type             String?
+  cosmetic_usage        String?
+  stress_level          Int?     @db.SmallInt
+  sleep_quality         Int?     @db.SmallInt
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis Analysis @relation(fields: [analysis_id], references: [id], onDelete: Cascade)
+
+  @@map("clinical_forms")
+}
+
+model AnalysisResult {
+  id                    String   @id @default(uuid()) @db.Uuid
+  analysis_id           String   @unique @db.Uuid
+  mite_count            Int?
+  mite_density          String?
+  confidence_score      Float?
+  yolo_output           Json?
+  gemma_report_tr       String?  @db.Text
+  gemma_report_en       String?  @db.Text
+  shap_scores           Json?
+  gradcam_url           String?
+  conformal_prediction  Json?
+  composite_score       Float?
+  processing_time_ms    Int?
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis Analysis @relation(fields: [analysis_id], references: [id], onDelete: Cascade)
+
+  @@map("analysis_results")
+}
+
+model DoctorFeedback {
+  id              String   @id @default(uuid()) @db.Uuid
+  analysis_id     String   @unique @db.Uuid
+  is_correct      Boolean?
+  correction      String?  @db.Text
+  corrected_mite_count Int?
+  corrected_density String?
+  notes           String?  @db.Text
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis Analysis @relation(fields: [analysis_id], references: [id], onDelete: Cascade)
+
+  @@map("doctor_feedback")
+}
+
+model Report {
+  id            String   @id @default(uuid()) @db.Uuid
+  analysis_id   String   @unique @db.Uuid
+  pdf_url       String?
+  json_data     Json?
+  fhir_data     Json?
+  status        String   @default("draft")
+  approved_at   DateTime? @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis Analysis @relation(fields: [analysis_id], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String?  @db.Uuid
+  action      String
+  table_name  String
+  record_id   String?
+  old_data    Json?
+  new_data    Json?
+  ip_address  String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  user Profile? @relation(fields: [user_id], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Embedding {
+  id              String   @id @default(uuid()) @db.Uuid
+  analysis_id     String?  @db.Uuid
+  patient_id      String?  @db.Uuid
+  embedding_type  String   @default("clinical")
+  embedding       Unsupported("vector(768)")
+  model_name      String   @default("biomedclip")
+  metadata        Json?
+  label           String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis Analysis? @relation(fields: [analysis_id], references: [id], onDelete: Cascade)
+  patient  Patient?  @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+
+  @@index([embedding_type])
+  @@index([label])
+  @@map("embeddings")
+}

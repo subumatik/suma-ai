@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
 import ThemeToggle from './ThemeToggle';
+import { useAuth } from './AuthProvider';
 
 const DRAWER_WIDTH = 260;
 const DRAWER_COLLAPSED = 72;
@@ -31,6 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const { user: authUser } = useAuth();
   const isMobile = useMediaQuery('(max-width: 960px)');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -118,13 +120,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Badge badgeContent={3} color="error"><Notifications /></Badge>
             </IconButton>
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-              <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.dark', fontSize: 14, fontWeight: 600 }}>D</Avatar>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.dark', fontSize: 14, fontWeight: 600 }}>
+                {(authUser?.email?.charAt(0) ?? 'U').toUpperCase()}
+              </Avatar>
             </IconButton>
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
               slotProps={{ paper: { sx: { borderRadius: 3, minWidth: 180 } } }}>
               <Box sx={{ px: 2, py: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Dr. Ahmet Yılmaz</Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>ahmet@klinik.com.tr</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {authUser?.user_metadata?.full_name ?? authUser?.email ?? 'Kullanıcı'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {authUser?.email ?? ''}
+                </Typography>
               </Box>
               <Divider />
               <MenuItem onClick={() => { setAnchorEl(null); router.push('/ayarlar'); }}>

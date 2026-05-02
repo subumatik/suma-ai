@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
+import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import Providers from "./providers";
 import AuthProvider from "@/components/AuthProvider";
 
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
       <body className={inter.variable}>
+        <InitColorSchemeScript attribute="class" />
         <AppRouterCacheProvider>
           <Providers>
             <AuthProvider>{children}</AuthProvider>

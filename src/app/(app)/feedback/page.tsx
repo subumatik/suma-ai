@@ -24,7 +24,7 @@ export default function FeedbackPage() {
     return (
       <Box sx={{ maxWidth: 600, mx: 'auto', mt: 8 }}>
         <Alert severity="success" sx={{ mb: 2 }}>Geri bildiriminiz kaydedildi. Aktif öğrenme havuzuna eklendi.</Alert>
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>Ana sayfaya yönlendiriliyorsunuz...</Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>Ana sayfaya yönlendiriliyorsunuz...</Typography>
       </Box>
     );
   }
