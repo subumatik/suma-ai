@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { CloudUpload, NavigateNext, NavigateBefore, Science } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
+import { invalidateDashboardCache, invalidatePatientListCache } from '@/lib/upstash/cache-actions';
 
 const steps = ['Hasta Seçimi', 'Görüntü Yükle', 'Klinik Form', 'Ön İzleme'];
 
@@ -19,7 +20,7 @@ interface Patient {
   gender: string | null;
 }
 
-export default function NewAnalysisClient({ patients }: { patients: Patient[] }) {
+export default function NewAnalysisClient({ patients, userId }: { patients: Patient[]; userId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedPatient = searchParams.get('patient');
@@ -100,6 +101,8 @@ export default function NewAnalysisClient({ patients }: { patients: Patient[] })
       return;
     }
 
+    await invalidateDashboardCache(userId);
+    await invalidatePatientListCache(userId);
     router.push(`/analiz/${analysis.id}`);
   };
 

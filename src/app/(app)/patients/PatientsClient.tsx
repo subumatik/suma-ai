@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { PersonAdd, Delete, Visibility } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
+import { invalidatePatientListCache } from '@/lib/upstash/cache-actions';
 
 interface Patient {
   id: string;
@@ -19,7 +20,7 @@ interface Patient {
   created_at: string;
 }
 
-export default function PatientsClient({ patients }: { patients: Patient[] }) {
+export default function PatientsClient({ patients, userId }: { patients: Patient[]; userId: string }) {
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
@@ -43,6 +44,7 @@ export default function PatientsClient({ patients }: { patients: Patient[] }) {
       setAge('');
       setGender('');
       setNotes('');
+      await invalidatePatientListCache(userId);
       router.refresh();
     }
   };
@@ -50,6 +52,7 @@ export default function PatientsClient({ patients }: { patients: Patient[] }) {
   const handleDelete = async (id: string) => {
     if (!confirm('Hasta silinecek. Emin misiniz?')) return;
     await supabase.from('patients').delete().eq('id', id);
+    await invalidatePatientListCache(userId);
     router.refresh();
   };
 

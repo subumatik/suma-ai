@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box, Typography, Card, CardContent, LinearProgress, Chip, Button,
-  Grid, Divider, Alert, Paper,
+  Grid, Divider, Alert, Paper, Link,
 } from '@mui/material';
 import { CheckCircle, Error, Science, Assignment, ArrowBack } from '@mui/icons-material';
 
@@ -43,6 +44,31 @@ interface AnalysisData {
 export default function AnalysisDetailClient({ analysis }: { analysis: AnalysisData }) {
   const router = useRouter();
   const result = analysis.analysis_results?.[0];
+  const [similarCases, setSimilarCases] = useState<Array<{
+    analysis_id: string;
+    patient_hash: string;
+    label: string;
+    mite_count?: number;
+    confidence_score?: number;
+    score: number;
+  }> | null>(null);
+
+  useEffect(() => {
+    if (analysis.status === 'COMPLETED' && analysis.clinical_forms) {
+      fetch('/api/vector/similar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisId: analysis.id,
+          form: analysis.clinical_forms,
+          topK: 5,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => setSimilarCases(data.similar ?? []))
+        .catch((err) => console.error('Similar cases fetch error:', err));
+    }
+  }, [analysis.status, analysis.id, analysis.clinical_forms]);
 
   const statusConfig = {
     PENDING: { label: 'Bekleniyor', color: 'warning' as const, icon: <Science /> },
@@ -172,6 +198,64 @@ export default function AnalysisDetailClient({ analysis }: { analysis: AnalysisD
               Geri Bildirim
             </Button>
           </Box>
+
+          {similarCases !== null && (
+            <Card sx={{ mt: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  Benzer Vakalar (Upstash Vector)
+                </Typography>
+                {similarCases.length > 0 ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {similarCases.map((c) => (
+                      <Box
+                        key={c.analysis_id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          p: 1.5,
+                          borderRadius: 2,
+                          bgcolor: 'action.hover',
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            Hasta {c.patient_hash}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {c.label} · Akar: {c.mite_count ?? '-'} · Güven: {c.confidence_score ? `%${Math.round(c.confidence_score * 100)}` : '-'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Chip
+                            label={`%${Math.round(c.score * 100)} eşleşme`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                          <Link
+                            href={`/analiz/${c.analysis_id}`}
+                            sx={{ ml: 1, fontSize: 12, cursor: 'pointer' }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              router.push(`/analiz/${c.analysis_id}`);
+                            }}
+                          >
+                            Görüntüle
+                          </Link>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Henüz benzer vaka bulunmuyor. Yeni analizler eklendikçe burada görünecek.
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </Box>
