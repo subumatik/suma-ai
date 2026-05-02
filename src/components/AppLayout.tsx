@@ -37,7 +37,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
   const drawerWidth = isMobile ? DRAWER_WIDTH : (collapsed ? DRAWER_COLLAPSED : DRAWER_WIDTH);
+
+  const notifications = [
+    { id: 1, text: 'Yeni analiz tamamlandı: Hasta #A7B2C1', time: '5 dk önce', read: false },
+    { id: 2, text: 'Dr. Matik bir raporu onayladı', time: '1 saat önce', read: false },
+    { id: 3, text: 'Sistem bakımı: 03:00', time: '3 saat önce', read: true },
+  ];
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -116,9 +123,58 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'Demodex AI'}
             </Typography>
             <ThemeToggle />
-            <IconButton sx={{ color: 'text.secondary' }}>
-              <Badge badgeContent={3} color="error"><Notifications /></Badge>
+            <IconButton onClick={(e) => setNotifAnchorEl(e.currentTarget)} sx={{ color: 'text.secondary' }}>
+              <Badge badgeContent={notifications.filter((n) => !n.read).length} color="error"><Notifications /></Badge>
             </IconButton>
+            <Menu
+              anchorEl={notifAnchorEl}
+              open={Boolean(notifAnchorEl)}
+              onClose={() => setNotifAnchorEl(null)}
+              slotProps={{
+                paper: { sx: { borderRadius: 3, minWidth: 320, maxWidth: 360 } },
+              }}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Bildirimler
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {notifications.filter((n) => !n.read).length} okunmamış
+                </Typography>
+              </Box>
+              <Divider />
+              {notifications.map((n) => (
+                <MenuItem
+                  key={n.id}
+                  onClick={() => setNotifAnchorEl(null)}
+                  sx={{
+                    py: 1.5,
+                    px: 2,
+                    bgcolor: n.read ? 'inherit' : 'action.hover',
+                    borderLeft: 3,
+                    borderColor: n.read ? 'transparent' : 'primary.main',
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: n.read ? 400 : 600, lineHeight: 1.4 }}>
+                      {n.text}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {n.time}
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+              {notifications.length === 0 && (
+                <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Bildirim bulunmuyor.
+                  </Typography>
+                </Box>
+              )}
+            </Menu>
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
               <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.dark', fontSize: 14, fontWeight: 600 }}>
                 {(authUser?.email?.charAt(0) ?? 'U').toUpperCase()}

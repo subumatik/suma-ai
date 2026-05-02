@@ -1,4 +1,4 @@
-import { redis } from './redis'
+import { getRedis } from './redis'
 
 export interface CacheOptions {
   ttl?: number
@@ -14,10 +14,12 @@ export async function cachedFetch<T>(
   const cacheKey = `${prefix}:${key}`
 
   try {
-    const cached = await redis.get<T>(cacheKey)
+    const cached = await getRedis().get<T>(cacheKey)
     if (cached !== null) {
+      console.log(`[CACHE HIT] ${cacheKey}`)
       return cached
     }
+    console.log(`[CACHE MISS] ${cacheKey}`)
   } catch {
     // Redis hata verirse devam et
   }
@@ -25,7 +27,7 @@ export async function cachedFetch<T>(
   const data = await fetcher()
 
   try {
-    await redis.setex(cacheKey, ttl, data)
+    await getRedis().setex(cacheKey, ttl, data)
   } catch {
     // Redis hata verirse sessizce devam et
   }
@@ -35,7 +37,7 @@ export async function cachedFetch<T>(
 
 export async function invalidateCache(key: string, prefix: string = 'cache'): Promise<void> {
   try {
-    await redis.del(`${prefix}:${key}`)
+    await getRedis().del(`${prefix}:${key}`)
   } catch {
     // Sessizce devam et
   }
@@ -43,9 +45,9 @@ export async function invalidateCache(key: string, prefix: string = 'cache'): Pr
 
 export async function invalidatePattern(pattern: string, prefix: string = 'cache'): Promise<void> {
   try {
-    const keys = await redis.keys(`${prefix}:${pattern}*`)
+    const keys = await getRedis().keys(`${prefix}:${pattern}*`)
     if (keys.length > 0) {
-      await redis.del(...keys)
+      await getRedis().del(...keys)
     }
   } catch {
     // Sessizce devam et

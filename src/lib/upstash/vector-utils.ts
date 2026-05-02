@@ -1,4 +1,4 @@
-import { clinicalIndex, type ClinicalVectorMetadata } from './vector'
+import { getClinicalIndex, type ClinicalVectorMetadata } from './vector'
 
 interface ClinicalFormData {
   age: number | null
@@ -61,7 +61,7 @@ export async function upsertAnalysisVector(
 ) {
   const vector = clinicalToVector(form)
 
-  await clinicalIndex.upsert({
+  await getClinicalIndex().upsert({
     id: analysisId,
     vector,
     metadata: {
@@ -84,7 +84,7 @@ export async function findSimilarCases(
 ): Promise<(ClinicalVectorMetadata & { score: number })[]> {
   const vector = clinicalToVector(form)
 
-  const results = await clinicalIndex.query({
+  const results = await getClinicalIndex().query({
     vector,
     topK: topK + 1, // +1 to filter out self
     includeMetadata: true,

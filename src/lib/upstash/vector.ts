@@ -11,7 +11,14 @@ export type ClinicalVectorMetadata = {
   created_at: string
 }
 
-export const clinicalIndex = new Index<ClinicalVectorMetadata>({
-  url: process.env.UPSTASH_VECTOR_REST_URL!,
-  token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
-})
+let _clinicalIndex: Index<ClinicalVectorMetadata> | null = null
+
+export function getClinicalIndex(): Index<ClinicalVectorMetadata> {
+  if (!_clinicalIndex) {
+    _clinicalIndex = new Index<ClinicalVectorMetadata>({
+      url: process.env.UPSTASH_VECTOR_REST_URL!,
+      token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
+    })
+  }
+  return _clinicalIndex
+}

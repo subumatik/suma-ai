@@ -18,9 +18,18 @@ export type ReportDocument = {
   }
 }
 
-export const searchClient = new Search({
-  url: process.env.UPSTASH_SEARCH_REST_URL!,
-  token: process.env.UPSTASH_SEARCH_REST_TOKEN!,
-})
+let _searchClient: Search | null = null
 
-export const reportsIndex = searchClient.index<ReportDocument['content']>('demodex-reports')
+function getSearchClient(): Search {
+  if (!_searchClient) {
+    _searchClient = new Search({
+      url: process.env.UPSTASH_SEARCH_REST_URL!,
+      token: process.env.UPSTASH_SEARCH_REST_TOKEN!,
+    })
+  }
+  return _searchClient
+}
+
+export function getReportsIndex() {
+  return getSearchClient().index<ReportDocument['content']>('demodex-reports')
+}

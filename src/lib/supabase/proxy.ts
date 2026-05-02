@@ -28,7 +28,11 @@ export async function updateSession(request: NextRequest) {
   )
 
   // refreshing the auth token
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch {
+    // Invalid refresh token — silently continue, page-level auth checks handle redirect
+  }
 
   return supabaseResponse
 }

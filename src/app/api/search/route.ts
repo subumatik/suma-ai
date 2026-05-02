@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { reportsIndex } from '@/lib/upstash/search'
+import { getReportsIndex } from '@/lib/upstash/search'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Query string required' }, { status: 400 })
     }
 
-    const results = await reportsIndex.search({
+    const results = await getReportsIndex().search({
       query,
       limit,
       reranking: true,

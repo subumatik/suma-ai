@@ -4,9 +4,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  turbopack: {
-    root: "C:\\Users\\Can Matik\\Documents\\demodex_next\\demodex-next",
-  },
+  // turbopack disabled for cross-platform builds
 };
 
 export default nextConfig;
