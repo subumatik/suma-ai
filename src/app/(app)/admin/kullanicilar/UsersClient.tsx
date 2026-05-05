@@ -1,84 +1,102 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import {
-  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Chip, FormControl, Select, MenuItem,
+  Box, Card, CardContent, Typography, TextField, Chip, Table,
+  TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  IconButton, Menu, MenuItem,
 } from '@mui/material';
+import { Search, MoreVert, Balance, Person, AdminPanelSettings } from '@mui/icons-material';
 
-interface User {
-  id: string
-  full_name: string | null
-  clinic_name: string | null
-  role: string
-  created_at: string
+interface UsersClientProps {
+  users: any[];
 }
 
-export default function UsersClient({ users }: { users: User[] }) {
-  const router = useRouter()
+export default function UsersClient({ users }: UsersClientProps) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [search, setSearch] = useState('');
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    await fetch('/api/admin/role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, role: newRole }),
-    })
-    router.refresh()
-  }
+  const filtered = users.filter((u) => {
+    const q = search.toLowerCase();
+    return u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.role?.toLowerCase().includes(q);
+  });
+
+  const handleRoleChange = async (role: string) => {
+    if (!selectedUser) return;
+    await supabase.from('profiles').update({ role }).eq('id', selectedUser.id);
+    setAnchorEl(null);
+    setSelectedUser(null);
+    router.refresh();
+  };
 
   return (
     <Box>
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>Kullanıcılar</Typography>
 
-      <Paper elevation={2} sx={{ borderRadius: 3, border: 1, borderColor: 'divider', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'action.hover' }}>
-                <TableCell>İsim</TableCell>
-                <TableCell>Klinik</TableCell>
-                <TableCell>Rol</TableCell>
-                <TableCell>Kayıt Tarihi</TableCell>
+      <TextField
+        placeholder="Kullanıcı ara..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        fullWidth
+        sx={{ mb: 3 }}
+        slotProps={{
+          input: {
+            startAdornment: <Search sx={{ fontSize: 18, color: 'text.secondary', mr: 1 }} />,
+          },
+        }}
+      />
+
+      <TableContainer component={Card}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Ad Soyad</TableCell>
+              <TableCell>E-posta</TableCell>
+              <TableCell>Telefon</TableCell>
+              <TableCell>Rol</TableCell>
+              <TableCell>Kayıt Tarihi</TableCell>
+              <TableCell align="right">İşlemler</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filtered.map((u) => (
+              <TableRow key={u.id} hover>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {u.role === 'lawyer' ? <Balance sx={{ fontSize: 18, color: 'primary.main' }} /> :
+                     u.role === 'admin' ? <AdminPanelSettings sx={{ fontSize: 18, color: 'error.main' }} /> :
+                     <Person sx={{ fontSize: 18, color: 'text.secondary' }} />}
+                    {u.full_name ?? 'İsimsiz'}
+                  </Box>
+                </TableCell>
+                <TableCell>{u.email ?? '-'}</TableCell>
+                <TableCell>{u.phone ?? '-'}</TableCell>
+                <TableCell>
+                  <Chip size="small" label={u.role === 'lawyer' ? 'Avukat' : u.role === 'admin' ? 'Admin' : 'Müvekkil'}
+                    color={u.role === 'lawyer' ? 'primary' : u.role === 'admin' ? 'error' : 'default'} />
+                </TableCell>
+                <TableCell>{new Date(u.created_at).toLocaleDateString('tr-TR')}</TableCell>
+                <TableCell align="right">
+                  <IconButton onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedUser(u); }}>
+                    <MoreVert />
+                  </IconButton>
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {u.full_name ?? 'İsimsiz'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
-                      {u.id.slice(0, 8)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{u.clinic_name ?? '-'}</TableCell>
-                  <TableCell>
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <Select
-                        value={u.role}
-                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                      >
-                        <MenuItem value="admin">Admin</MenuItem>
-                        <MenuItem value="researcher">Araştırmacı</MenuItem>
-                        <MenuItem value="doctor">Doktor</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </TableCell>
-                  <TableCell>{new Date(u.created_at).toLocaleDateString('tr-TR')}</TableCell>
-                </TableRow>
-              ))}
-              {users.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Kullanıcı bulunmuyor.</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+        <MenuItem onClick={() => handleRoleChange('client')}>Müvekkil Yap</MenuItem>
+        <MenuItem onClick={() => handleRoleChange('lawyer')}>Avukat Yap</MenuItem>
+        <MenuItem onClick={() => handleRoleChange('admin')}>Admin Yap</MenuItem>
+      </Menu>
     </Box>
-  )
+  );
 }

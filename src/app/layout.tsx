@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
 import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import Providers from "./providers";
 import AuthProvider from "@/components/AuthProvider";
 
-const inter = Inter({
+const montserrat = Montserrat({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-montserrat",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Demodex AI - Akilli Dermatoloji Asistani",
+  title: "Avukatip - Avukatip Platformu",
   description:
-    "Yapay zeka destekli Demodex analizi ve dermatoloji asistani. Gercek zamanli goruntu analizi ve uzman onerileri.",
+    "Avukatip ile avukatınızdan randevu alın, dava dosyalarınızı takip edin ve avukatınızla güvenli mesajlaşın.",
 };
 
 export default function RootLayout({
@@ -25,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={inter.variable}>
+      <body className={montserrat.variable} style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}>
         <InitColorSchemeScript attribute="class" />
         <AppRouterCacheProvider>
           <Providers>

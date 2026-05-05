@@ -1,51 +1,47 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import AdminDashboardClient from './AdminDashboardClient'
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import AdminDashboardClient from './AdminDashboardClient';
 
 export default async function AdminPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect('/login')
+  if (!user) redirect('/login');
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .single();
 
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  if (profile?.role !== 'admin') redirect('/dashboard');
 
-  // Stats
-  const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
-  const { count: totalPatients } = await supabase.from('patients').select('*', { count: 'exact', head: true })
-  const { count: totalAnalyses } = await supabase.from('analyses').select('*', { count: 'exact', head: true })
-  const { count: totalReports } = await supabase.from('reports').select('*', { count: 'exact', head: true })
+  const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+  const { count: totalCases } = await supabase.from('cases').select('*', { count: 'exact', head: true });
+  const { count: totalAppointments } = await supabase.from('appointments').select('*', { count: 'exact', head: true });
+  const { count: totalMessages } = await supabase.from('messages').select('*', { count: 'exact', head: true });
 
-  const { data: recentAnalyses } = await supabase
-    .from('analyses')
-    .select('*, patients(anonymous_hash), analysis_results(mite_count, confidence_score)')
+  const { data: usersByRole } = await supabase.from('profiles').select('role');
+  const lawyerCount = usersByRole?.filter((u) => u.role === 'lawyer').length ?? 0;
+  const clientCount = usersByRole?.filter((u) => u.role === 'client').length ?? 0;
+
+  const { data: recentUsers } = await supabase
+    .from('profiles')
+    .select('*')
     .order('created_at', { ascending: false })
-    .limit(10)
-
-  const { data: categoryCounts } = await supabase
-    .from('analysis_results')
-    .select('mite_count')
-
-  const demodexCount = categoryCounts?.filter((r) => (r.mite_count ?? 0) > 0).length ?? 0
-  const healthyCount = categoryCounts?.filter((r) => r.mite_count === 0).length ?? 0
+    .limit(10);
 
   return (
     <AdminDashboardClient
       stats={{
         totalUsers: totalUsers ?? 0,
-        totalPatients: totalPatients ?? 0,
-        totalAnalyses: totalAnalyses ?? 0,
-        totalReports: totalReports ?? 0,
-        demodexCount,
-        healthyCount,
+        totalCases: totalCases ?? 0,
+        totalAppointments: totalAppointments ?? 0,
+        totalMessages: totalMessages ?? 0,
+        lawyerCount,
+        clientCount,
       }}
-      recentAnalyses={recentAnalyses ?? []}
+      recentUsers={recentUsers ?? []}
     />
-  )
+  );
 }

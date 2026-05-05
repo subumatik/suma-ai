@@ -1,25 +1,25 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import UsersClient from './UsersClient'
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import UsersClient from './UsersClient';
 
 export default async function UsersPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect('/login')
+  if (!user) redirect('/login');
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .single();
 
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  if (profile?.role !== 'admin') redirect('/dashboard');
 
   const { data: users } = await supabase
     .from('profiles')
-    .select('id, full_name, clinic_name, role, created_at')
-    .order('created_at', { ascending: false })
+    .select('id, full_name, email, phone, role, baro_number, specialization, created_at')
+    .order('created_at', { ascending: false });
 
-  return <UsersClient users={users ?? []} />
+  return <UsersClient users={users ?? []} />;
 }

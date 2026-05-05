@@ -1,126 +1,199 @@
 'use client';
 
-import { Box, Typography, Paper, Grid, Card, CardContent, LinearProgress } from '@mui/material';
+import { useRouter } from 'next/navigation';
+import { Box, Card, CardContent, Typography, Button, Chip, Avatar, Grid } from '@mui/material';
 import {
-  Science as ScienceIcon,
-  People as PeopleIcon,
-  Assessment as AssessmentIcon,
-  TrendingUp as TrendingUpIcon,
+  Folder, CalendarMonth, Chat, People, CheckCircle, Pending, Schedule,
 } from '@mui/icons-material';
 
-interface RecentAnalysis {
-  id: string;
-  status: string;
-  created_at: string;
-  patients: { anonymous_hash: string } | null;
-  analysis_results: { mite_count: number | null; confidence_score: number | null }[] | null;
+interface DashboardClientProps {
+  role: string;
+  profile: any;
+  dosyalar: any[];
+  appointments: any[];
+  unreadMessages: number;
+  totalUsers: number;
+  totalDosyalar: number;
+  categories: any[];
+  statuses: any[];
 }
 
-interface Stats {
-  totalAnalyses: number;
-  activePatients: number;
-  thisMonthReports: number;
-  successRate: number;
-}
+export default function DashboardClient({ role, profile, dosyalar, appointments, unreadMessages, totalUsers, totalDosyalar, categories, statuses }: DashboardClientProps) {
+  const router = useRouter();
 
-export default function DashboardClient({ stats, recentAnalyses }: { stats: Stats; recentAnalyses: RecentAnalysis[] }) {
-  const statCards = [
-    { title: 'Toplam Analiz', value: stats.totalAnalyses.toString(), icon: ScienceIcon, color: 'primary' as const },
-    { title: 'Aktif Hastalar', value: stats.activePatients.toString(), icon: PeopleIcon, color: 'secondary' as const },
-    { title: 'Bu Ay Rapor', value: stats.thisMonthReports.toString(), icon: AssessmentIcon, color: 'info' as const },
-    { title: 'Başarı Oranı', value: `%${stats.successRate}`, icon: TrendingUpIcon, color: 'success' as const },
-  ];
+  const isLawyer = role === 'lawyer';
+  const isAdmin = role === 'admin';
 
-  const getSeverity = (miteCount: number | null) => {
-    if (miteCount === null) return { label: 'Bekleniyor', color: 'text.secondary' as const };
-    if (miteCount === 0) return { label: 'Negatif', color: 'success.main' as const };
-    if (miteCount <= 3) return { label: 'Hafif', color: 'warning.main' as const };
-    return { label: 'Ağır', color: 'error.main' as const };
-  };
+  const activeDosyalar = dosyalar.filter((d) => d.status?.name !== 'Tamamlandı' && d.status?.name !== 'Kapandı').length;
+
+  const stats = isAdmin
+    ? [
+        { label: 'Toplam Kullanıcı', value: totalUsers, icon: <People />, color: '#3B82F6' },
+        { label: 'Toplam Dosya', value: totalDosyalar, icon: <Folder />, color: '#C9A227' },
+        { label: 'Aktif Dosya', value: activeDosyalar, icon: <CheckCircle />, color: '#10B981' },
+      ]
+    : [
+        { label: isLawyer ? 'Toplam Dosya' : 'Dosyalarım', value: dosyalar.length, icon: <Folder />, color: '#3B82F6' },
+        { label: 'Aktif Dosya', value: activeDosyalar, icon: <CheckCircle />, color: '#10B981' },
+        { label: 'Yaklaşan Randevu', value: appointments.length, icon: <CalendarMonth />, color: '#C9A227' },
+        { label: 'Okunmamış Mesaj', value: unreadMessages, icon: <Chat />, color: '#EF4444' },
+      ];
+
+  // Kategori dağılımı
+  const catCounts: Record<string, number> = {};
+  dosyalar.forEach((d) => {
+    const name = d.category?.name ?? 'Kategorisiz';
+    catCounts[name] = (catCounts[name] ?? 0) + 1;
+  });
+
+  // Durum dağılımı
+  const statusCounts: Record<string, number> = {};
+  dosyalar.forEach((d) => {
+    const name = d.status?.name ?? 'Bilinmiyor';
+    statusCounts[name] = (statusCounts[name] ?? 0) + 1;
+  });
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>Dashboard</Typography>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          Hoş Geldiniz, {profile?.full_name ?? 'Kullanıcı'}
+        </Typography>
+        <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+          {isLawyer ? 'Avukat panelinizden dosyalarınızı ve müvekkillerinizi yönetebilirsiniz.' :
+           isAdmin ? 'Sistem yönetim paneline hoş geldiniz.' :
+           'Dosyalarınızı takip edebilir ve avukatınızla iletişim kurabilirsiniz.'}
+        </Typography>
+      </Box>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statCards.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={stat.title}>
-              <Card elevation={2} sx={{ borderRadius: 3, border: 1, borderColor: 'divider' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: `${stat.color}.main`, color: `${stat.color}.contrastText` }}>
-                      <Icon sx={{ fontSize: 24 }} />
-                    </Box>
+        {stats.map((s) => (
+          <Grid size={{ xs: 12, sm: 6, md: isAdmin ? 4 : 3 }} key={s.label}>
+            <Card>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: `${s.color}20`, color: s.color, width: 48, height: 48 }}>{s.icon}</Avatar>
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{s.value}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>{s.label}</Typography>
                   </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>{stat.value}</Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>{stat.title}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          );
-        })}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper elevation={2} sx={{ p: 3, borderRadius: 3, border: 1, borderColor: 'divider' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>Son Analizler</Typography>
-            {recentAnalyses.map((analysis, idx) => {
-              const result = analysis.analysis_results?.[0];
-              const severity = getSeverity(result?.mite_count ?? null);
-              return (
-                <Box key={analysis.id}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2 }}>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Hasta {analysis.patients?.anonymous_hash ?? analysis.id.slice(0, 8)}
-                      </Typography>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>Son Dosyalar</Typography>
+                <Button size="small" onClick={() => router.push('/dosyalar')}>Tümünü Gör</Button>
+              </Box>
+              {dosyalar.length === 0 ? (
+                <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz dosya bulunmuyor.</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {dosyalar.map((d) => (
+                    <Box key={d.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', cursor: 'pointer' }} onClick={() => router.push(`/dosyalar/${d.id}`)}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{d.title}</Typography>
+                        <Chip size="small" label={d.status?.name ?? '-'} sx={{ bgcolor: d.status?.color + '20', color: d.status?.color }} />
+                      </Box>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {new Date(analysis.created_at).toLocaleDateString('tr-TR')}
+                        {d.file_number ?? 'Dosya No: Belirtilmemiş'} · {d.category?.name ?? 'Kategorisiz'} · {isLawyer ? d.client?.full_name : d.lawyer?.full_name}
                       </Typography>
                     </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: severity.color }}>
-                        {severity.label}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {analysis.status}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  {idx < recentAnalyses.length - 1 && <Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}
+                  ))}
                 </Box>
-              );
-            })}
-            {recentAnalyses.length === 0 && (
-              <Typography variant="body2" sx={{ color: 'text.secondary', py: 4, textAlign: 'center' }}>
-                Henüz analiz bulunmuyor.
-              </Typography>
-            )}
-          </Paper>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
 
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Paper elevation={2} sx={{ p: 3, borderRadius: 3, border: 1, borderColor: 'divider' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>Sistem Durumu</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {[
-                { label: 'AI Model', value: 98, status: 'Aktif' },
-                { label: 'Görüntü İşleme', value: 95, status: 'Aktif' },
-                { label: 'Veritabanı', value: 100, status: 'Bağlı' },
-              ].map((item) => (
-                <Box key={item.label}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>{item.label}</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>{item.status}</Typography>
-                  </Box>
-                  <LinearProgress variant="determinate" value={item.value} color="success" sx={{ height: 8, borderRadius: 4 }} />
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>Yaklaşan Randevular</Typography>
+                <Button size="small" onClick={() => router.push('/randevular')}>Tümünü Gör</Button>
+              </Box>
+              {appointments.length === 0 ? (
+                <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz randevu bulunmuyor.</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {appointments.map((a) => {
+                    const stMap: Record<string, { label: string; color: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
+                      REQUESTED: { label: 'Talep Edildi', color: 'warning' },
+                      CONFIRMED: { label: 'Onaylandı', color: 'success' },
+                      CANCELLED: { label: 'İptal', color: 'error' },
+                      COMPLETED: { label: 'Tamamlandı', color: 'info' },
+                    };
+                    const st = stMap[a.status] ?? { label: a.status, color: 'default' };
+                    return (
+                      <Box key={a.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{a.topic ?? 'Randevu'}</Typography>
+                          <Chip size="small" label={st.label} color={st.color} />
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Schedule sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {new Date(a.appointment_date).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  })}
                 </Box>
-              ))}
-            </Box>
-          </Paper>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Kategori ve Durum Dağılımı */}
+      <Grid container spacing={3} sx={{ mt: 0 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Kategori Dağılımı</Typography>
+              {Object.keys(catCounts).length === 0 ? (
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Henüz veri yok.</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {Object.entries(catCounts).map(([name, count]) => {
+                    const cat = categories.find((c) => c.name === name);
+                    return (
+                      <Chip key={name} label={`${name}: ${count}`} sx={{ bgcolor: (cat?.color ?? '#3B82F6') + '20', color: cat?.color ?? '#3B82F6' }} />
+                    );
+                  })}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Durum Dağılımı</Typography>
+              {Object.keys(statusCounts).length === 0 ? (
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Henüz veri yok.</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {Object.entries(statusCounts).map(([name, count]) => {
+                    const st = statuses.find((s) => s.name === name);
+                    return (
+                      <Chip key={name} label={`${name}: ${count}`} sx={{ bgcolor: (st?.color ?? '#3B82F6') + '20', color: st?.color ?? '#3B82F6' }} />
+                    );
+                  })}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
     </Box>

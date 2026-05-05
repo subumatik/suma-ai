@@ -38,9 +38,9 @@ body * {
   background-color: var(--mui-palette-text-disabled, rgba(128, 128, 128, 0.5));
 }
 
-/* Smooth scroll */
+/* Route transition scroll handled by Next.js */
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 /* Typing indicator animation */

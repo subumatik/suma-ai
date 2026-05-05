@@ -8,9 +8,9 @@ import {
   Badge, Menu, MenuItem, Divider, useMediaQuery,
 } from '@mui/material';
 import {
-  Dashboard, People, AddCircle, Assignment, Settings,
-  Logout, Menu as MenuIcon, ChevronLeft, Notifications, Science,
-  Chat as ChatIcon, PhotoLibrary, AdminPanelSettings,
+  Dashboard, Folder, CalendarMonth, Chat, People, Person,
+  Logout, Menu as MenuIcon, ChevronLeft, Notifications, Balance,
+  Settings, AdminPanelSettings, Category, Rule,
 } from '@mui/icons-material';
 import { createClient } from '@/lib/supabase/client';
 import ThemeToggle from './ThemeToggle';
@@ -19,17 +19,27 @@ import { useAuth } from './AuthProvider';
 const DRAWER_WIDTH = 260;
 const DRAWER_COLLAPSED = 72;
 
-const baseNavItems = [
-  { label: 'Dashboard', path: '/', icon: <Dashboard /> },
-  { label: 'Hasta Listesi', path: '/patients', icon: <People /> },
-  { label: 'Yeni Analiz', path: '/analiz/yeni', icon: <AddCircle /> },
-  { label: 'AI Sohbet', path: '/chat', icon: <ChatIcon /> },
-  { label: 'Galeri', path: '/galeri', icon: <PhotoLibrary /> },
-  { label: 'Raporlar', path: '/raporlar', icon: <Assignment /> },
-  { label: 'Ayarlar', path: '/ayarlar', icon: <Settings /> },
+const lawyerNavItems = [
+  { label: 'Anasayfa', path: '/dashboard', icon: <Dashboard /> },
+  { label: 'Müvekkillerim', path: '/müvekkiller', icon: <People /> },
+  { label: 'Dosyalarım', path: '/dosyalar', icon: <Folder /> },
+  { label: 'Randevularım', path: '/randevular', icon: <CalendarMonth /> },
+  { label: 'Mesajlar', path: '/mesajlar', icon: <Chat /> },
+  { label: 'Kategoriler', path: '/kategoriler', icon: <Category /> },
+  { label: 'Durumlar', path: '/durumlar', icon: <Rule /> },
+  { label: 'Ayarlar', path: '/profil', icon: <Settings /> },
 ];
 
-const adminNavItem = { label: 'Admin', path: '/admin', icon: <AdminPanelSettings /> };
+const clientNavItems = [
+  { label: 'Anasayfa', path: '/dashboard', icon: <Dashboard /> },
+  { label: 'Dosyalarım', path: '/dosyalar', icon: <Folder /> },
+  { label: 'Randevularım', path: '/randevular', icon: <CalendarMonth /> },
+  { label: 'Mesajlar', path: '/mesajlar', icon: <Chat /> },
+  { label: 'Avukatlarım', path: '/avukatlar', icon: <Person /> },
+  { label: 'Ayarlar', path: '/profil', icon: <Settings /> },
+];
+
+const adminNavItem = { label: 'Yönetim', path: '/admin', icon: <AdminPanelSettings /> };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -43,14 +53,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
   const drawerWidth = isMobile ? DRAWER_WIDTH : (collapsed ? DRAWER_COLLAPSED : DRAWER_WIDTH);
 
+  const baseNavItems = role === 'lawyer' ? lawyerNavItems : clientNavItems;
   const navItems = role === 'admin'
     ? [baseNavItems[0], adminNavItem, ...baseNavItems.slice(1)]
     : baseNavItems;
 
   const [notifications, setNotifications] = useState([
-    { id: 1, text: 'Yeni analiz tamamlandı: Hasta #A7B2C1', time: '5 dk önce', read: false, path: '/analiz/123e4567-e89b-12d3-a456-426614174000' as string | null },
-    { id: 2, text: 'Dr. Matik bir raporu onayladı', time: '1 saat önce', read: false, path: '/raporlar' as string | null },
-    { id: 3, text: 'Sistem bakımı: 03:00', time: '3 saat önce', read: true, path: null as string | null },
+    { id: 1, text: 'Yeni randevu talebi: Ahmet Yılmaz', time: '5 dk önce', read: false, path: '/randevular' as string | null },
+    { id: 2, text: 'Dosya durumu güncellendi: #2025/42', time: '1 saat önce', read: false, path: '/dosyalar' as string | null },
+    { id: 3, text: 'Yeni mesaj: Mehtap Kaya', time: '3 saat önce', read: true, path: '/mesajlar' as string | null },
   ]);
 
   const handleNotifClick = (id: number, path: string | null) => {
@@ -69,10 +80,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Toolbar sx={{ px: 2.5, minHeight: 72, gap: 1.5 }}>
-        <Science sx={{ color: 'primary.main', fontSize: 28 }} />
+        <Balance sx={{ color: 'primary.main', fontSize: 28 }} />
         {!collapsed && (
-          <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.02em' }}>
-            Demodex AI
+          <Typography variant="h6" sx={{ letterSpacing: '-0.02em', fontFamily: '"Montserrat",sans-serif' }}>
+            <Box component="span" sx={{ fontWeight: 400 }}>Avukat</Box>
+            <Box component="span" sx={{ fontWeight: 700 }}>Katip</Box>
           </Typography>
         )}
       </Toolbar>
@@ -135,7 +147,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </IconButton>
             )}
             <Typography variant="subtitle1" sx={{ color: 'text.secondary', flexGrow: 1 }}>
-              {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'Demodex AI'}
+              {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'AvukatKatip'}
             </Typography>
             <ThemeToggle />
             <IconButton onClick={(e) => setNotifAnchorEl(e.currentTarget)} sx={{ color: 'text.secondary' }}>
@@ -152,9 +164,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
               <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Bildirimler
-                </Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Bildirimler</Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   {notifications.filter((n) => !n.read).length} okunmamış
                 </Typography>
@@ -207,7 +217,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Typography>
               </Box>
               <Divider />
-              <MenuItem onClick={() => { setAnchorEl(null); router.push('/ayarlar'); }}>
+              <MenuItem onClick={() => { setAnchorEl(null); router.push('/profil'); }}>
                 <Settings sx={{ mr: 1.5, fontSize: 18, color: 'text.secondary' }} /> Ayarlar
               </MenuItem>
               <MenuItem onClick={() => { setAnchorEl(null); handleLogout(); }}>

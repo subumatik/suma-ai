@@ -24,7 +24,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const loadProfile = async (userId: string) => {
     const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
-    setRole(data?.role ?? 'doctor')
+    setRole(data?.role ?? 'client')
   }
 
   useEffect(() => {

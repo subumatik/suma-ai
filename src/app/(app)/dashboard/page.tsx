@@ -1,46 +1,75 @@
 import { createClient } from '@/lib/supabase/server';
-import { cachedFetch } from '@/lib/upstash/cache';
+import { redirect } from 'next/navigation';
 import DashboardClient from './DashboardClient';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id ?? 'anon';
+  if (!user) redirect('/login');
 
-  const dashboardData = await cachedFetch(
-    `dashboard:${userId}`,
-    async () => {
-      const { count: totalAnalyses } = await supabase
-        .from('analyses')
-        .select('*', { count: 'exact', head: true });
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const role = profile?.role ?? 'client';
 
-      const { count: activePatients } = await supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true });
+  let dosyalar: any[] = [];
+  let appointments: any[] = [];
+  let unreadMessages = 0;
+  let totalUsers = 0;
+  let totalDosyalar = 0;
+  let categories: any[] = [];
+  let statuses: any[] = [];
 
-      const { count: thisMonthReports } = await supabase
-        .from('reports')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+  if (role === 'lawyer') {
+    const [{ data: d }, { data: a }, { count: um }, { data: cat }, { data: st }] = await Promise.all([
+      supabase.from('dosyalar').select('*, client:client_id(full_name), category:category_id(name,color), status:status_id(name,color)').eq('lawyer_id', user.id).order('updated_at', { ascending: false }).limit(5),
+      supabase.from('appointments').select('*').eq('lawyer_id', user.id).gte('appointment_date', new Date().toISOString()).order('appointment_date', { ascending: true }).limit(5),
+      supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('is_read', false),
+      supabase.from('categories').select('*').or(`is_system.eq.true,created_by.eq.${user.id}`),
+      supabase.from('statuses').select('*').or(`is_system.eq.true,created_by.eq.${user.id}`).order('order', { ascending: true }),
+    ]);
+    dosyalar = d ?? [];
+    appointments = a ?? [];
+    unreadMessages = um ?? 0;
+    categories = cat ?? [];
+    statuses = st ?? [];
+  } else if (role === 'client') {
+    const [{ data: d }, { data: a }, { count: um }, { data: cat }, { data: st }] = await Promise.all([
+      supabase.from('dosyalar').select('*, lawyer:lawyer_id(full_name), category:category_id(name,color), status:status_id(name,color)').eq('client_id', user.id).order('updated_at', { ascending: false }).limit(5),
+      supabase.from('appointments').select('*').eq('client_id', user.id).gte('appointment_date', new Date().toISOString()).order('appointment_date', { ascending: true }).limit(5),
+      supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('is_read', false),
+      supabase.from('categories').select('*'),
+      supabase.from('statuses').select('*').order('order', { ascending: true }),
+    ]);
+    dosyalar = d ?? [];
+    appointments = a ?? [];
+    unreadMessages = um ?? 0;
+    categories = cat ?? [];
+    statuses = st ?? [];
+  } else if (role === 'admin') {
+    const [{ count: tu }, { count: td }, { data: d }, { data: cat }, { data: st }] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('dosyalar').select('*', { count: 'exact', head: true }),
+      supabase.from('dosyalar').select('*, client:client_id(full_name), category:category_id(name,color), status:status_id(name,color)').order('updated_at', { ascending: false }).limit(5),
+      supabase.from('categories').select('*'),
+      supabase.from('statuses').select('*').order('order', { ascending: true }),
+    ]);
+    totalUsers = tu ?? 0;
+    totalDosyalar = td ?? 0;
+    dosyalar = d ?? [];
+    categories = cat ?? [];
+    statuses = st ?? [];
+  }
 
-      const { data: recentAnalyses } = await supabase
-        .from('analyses')
-        .select('*, patients(anonymous_hash), analysis_results(mite_count, confidence_score)')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      return {
-        stats: {
-          totalAnalyses: totalAnalyses ?? 0,
-          activePatients: activePatients ?? 0,
-          thisMonthReports: thisMonthReports ?? 0,
-          successRate: 94.2,
-        },
-        recentAnalyses: recentAnalyses ?? [],
-      };
-    },
-    { ttl: 60 }
+  return (
+    <DashboardClient
+      role={role}
+      profile={profile}
+      dosyalar={dosyalar}
+      appointments={appointments}
+      unreadMessages={unreadMessages}
+      totalUsers={totalUsers}
+      totalDosyalar={totalDosyalar}
+      categories={categories}
+      statuses={statuses}
+    />
   );
-
-  return <DashboardClient stats={dashboardData.stats} recentAnalyses={dashboardData.recentAnalyses} />;
 }
