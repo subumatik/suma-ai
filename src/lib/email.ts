@@ -46,7 +46,7 @@ function wrapEmailBody(title: string, bodyContent: string, isOtp = false, otpCod
               ` : `<div style="color: #4b5563; font-size: 16px; line-height: 1.6;">${bodyContent}</div>`}
               <div style="border-top: 1px solid #e5e7eb; margin: 24px 0; width: 100%;"></div>
               <p style="margin: 0; font-size: 13px; color: #9ca3af; text-align: center;">
-                Avukatip - Avukatip Platformu
+                Avukatip Platformu
               </p>
             </td>
           </tr>

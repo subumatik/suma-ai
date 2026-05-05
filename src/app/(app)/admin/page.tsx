@@ -17,7 +17,7 @@ export default async function AdminPage() {
   if (profile?.role !== 'admin') redirect('/dashboard');
 
   const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-  const { count: totalCases } = await supabase.from('cases').select('*', { count: 'exact', head: true });
+  const { count: totalCases } = await supabase.from('dosyalar').select('*', { count: 'exact', head: true });
   const { count: totalAppointments } = await supabase.from('appointments').select('*', { count: 'exact', head: true });
   const { count: totalMessages } = await supabase.from('messages').select('*', { count: 'exact', head: true });
 

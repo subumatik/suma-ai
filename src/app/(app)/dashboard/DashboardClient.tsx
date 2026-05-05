@@ -90,14 +90,14 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>Son Dosyalar</Typography>
-                <Button size="small" onClick={() => router.push('/dosyalar')}>Tümünü Gör</Button>
+                <Button size="small" onClick={() => router.push('/cases')}>Tümünü Gör</Button>
               </Box>
               {dosyalar.length === 0 ? (
                 <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz dosya bulunmuyor.</Typography>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {dosyalar.map((d) => (
-                    <Box key={d.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', cursor: 'pointer' }} onClick={() => router.push(`/dosyalar/${d.id}`)}>
+                    <Box key={d.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', cursor: 'pointer' }} onClick={() => router.push(`/cases/${d.id}`)}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{d.title}</Typography>
                         <Chip size="small" label={d.status?.name ?? '-'} sx={{ bgcolor: d.status?.color + '20', color: d.status?.color }} />
@@ -118,7 +118,7 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>Yaklaşan Randevular</Typography>
-                <Button size="small" onClick={() => router.push('/randevular')}>Tümünü Gör</Button>
+                <Button size="small" onClick={() => router.push('/appointments')}>Tümünü Gör</Button>
               </Box>
               {appointments.length === 0 ? (
                 <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz randevu bulunmuyor.</Typography>

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { StorageProvider } from './types'
 
-const BUCKET = 'patient-images'
+const BUCKET = 'case-documents'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,8 +16,16 @@ async function ensureBucket() {
   const exists = buckets?.some((b) => b.name === BUCKET)
   if (!exists) {
     await supabaseAdmin.storage.createBucket(BUCKET, {
-      public: true,
+      public: false,
       fileSizeLimit: 10 * 1024 * 1024, // 10MB
+      allowedMimeTypes: [
+        'application/pdf',
+        'image/png',
+        'image/jpeg',
+        'image/webp',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ],
     })
   }
   bucketChecked = true
@@ -30,13 +38,11 @@ export class SupabaseStorage implements StorageProvider {
       .from(BUCKET)
       .upload(path, file, { upsert: true })
     if (error) throw error
-    const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path)
-    return data.publicUrl
+    return path
   }
 
   getUrl(path: string): string {
-    const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path)
-    return data.publicUrl
+    return path
   }
 
   async delete(path: string): Promise<void> {

@@ -3,6 +3,7 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import { Balance } from '@mui/icons-material';
 import { ReactNode } from 'react';
+import ThemeToggle from '../ThemeToggle';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -26,12 +27,15 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(ellipse at 30% 50%, rgba(30,58,95,0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 30%, rgba(201,162,39,0.05) 0%, transparent 50%)',
+            'radial-gradient(ellipse at 30% 50%, rgba(255,255,255,0.03) 0%, transparent 60%), radial-gradient(ellipse at 70% 30%, rgba(201,162,39,0.04) 0%, transparent 50%)',
         }}
       />
       <Box sx={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 440, p: 2 }}>
         <Card>
-          <CardContent sx={{ p: 4 }}>
+          <CardContent sx={{ p: 4, position: 'relative' }}>
+            <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
+              <ThemeToggle />
+            </Box>
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <Box
                 sx={{

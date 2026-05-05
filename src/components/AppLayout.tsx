@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Box, Drawer, AppBar, Toolbar, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, IconButton, Typography, Avatar,
-  Badge, Menu, MenuItem, Divider, useMediaQuery,
+  Badge, Menu, MenuItem, Divider, useMediaQuery, alpha,
 } from '@mui/material';
 import {
   Dashboard, Folder, CalendarMonth, Chat, People, Person,
@@ -16,30 +16,54 @@ import { createClient } from '@/lib/supabase/client';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from './AuthProvider';
 
-const DRAWER_WIDTH = 260;
-const DRAWER_COLLAPSED = 72;
+const DRAWER_WIDTH = 270;
+const DRAWER_COLLAPSED = 76;
 
 const lawyerNavItems = [
   { label: 'Anasayfa', path: '/dashboard', icon: <Dashboard /> },
-  { label: 'Müvekkillerim', path: '/müvekkiller', icon: <People /> },
-  { label: 'Dosyalarım', path: '/dosyalar', icon: <Folder /> },
-  { label: 'Randevularım', path: '/randevular', icon: <CalendarMonth /> },
-  { label: 'Mesajlar', path: '/mesajlar', icon: <Chat /> },
-  { label: 'Kategoriler', path: '/kategoriler', icon: <Category /> },
-  { label: 'Durumlar', path: '/durumlar', icon: <Rule /> },
-  { label: 'Ayarlar', path: '/profil', icon: <Settings /> },
+  { label: 'Müvekkillerim', path: '/clients', icon: <People /> },
+  { label: 'Dosyalarım', path: '/cases', icon: <Folder /> },
+  { label: 'Randevularım', path: '/appointments', icon: <CalendarMonth /> },
+  { label: 'Mesajlar', path: '/messages', icon: <Chat /> },
+  { label: 'Kategoriler', path: '/categories', icon: <Category /> },
+  { label: 'Durumlar', path: '/statuses', icon: <Rule /> },
+  { label: 'Ayarlar', path: '/settings', icon: <Settings /> },
 ];
 
 const clientNavItems = [
   { label: 'Anasayfa', path: '/dashboard', icon: <Dashboard /> },
-  { label: 'Dosyalarım', path: '/dosyalar', icon: <Folder /> },
-  { label: 'Randevularım', path: '/randevular', icon: <CalendarMonth /> },
-  { label: 'Mesajlar', path: '/mesajlar', icon: <Chat /> },
-  { label: 'Avukatlarım', path: '/avukatlar', icon: <Person /> },
-  { label: 'Ayarlar', path: '/profil', icon: <Settings /> },
+  { label: 'Dosyalarım', path: '/cases', icon: <Folder /> },
+  { label: 'Randevularım', path: '/appointments', icon: <CalendarMonth /> },
+  { label: 'Mesajlar', path: '/messages', icon: <Chat /> },
+  { label: 'Avukatlarım', path: '/lawyers', icon: <Person /> },
+  { label: 'Ayarlar', path: '/settings', icon: <Settings /> },
 ];
 
 const adminNavItem = { label: 'Yönetim', path: '/admin', icon: <AdminPanelSettings /> };
+
+interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string | null;
+  related_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+/** Format a date string as a relative time label (e.g. "5 dk önce") */
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'Az önce';
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} saat önce`;
+  const days = Math.floor(hours / 24);
+  return `${days} gün önce`;
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -58,17 +82,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ? [baseNavItems[0], adminNavItem, ...baseNavItems.slice(1)]
     : baseNavItems;
 
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: 'Yeni randevu talebi: Ahmet Yılmaz', time: '5 dk önce', read: false, path: '/randevular' as string | null },
-    { id: 2, text: 'Dosya durumu güncellendi: #2025/42', time: '1 saat önce', read: false, path: '/dosyalar' as string | null },
-    { id: 3, text: 'Yeni mesaj: Mehtap Kaya', time: '3 saat önce', read: true, path: '/mesajlar' as string | null },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  const handleNotifClick = (id: number, path: string | null) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) {
+        const data: NotificationItem[] = await res.json();
+        setNotifications(data);
+      }
+    } catch {
+      // silently ignore – notifications are non-critical
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const handleNotifClick = async (id: string) => {
+    // Optimistically mark as read in UI
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+    );
     setNotifAnchorEl(null);
-    if (path) {
-      router.push(path);
+
+    // Persist read state to DB
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+    } catch {
+      // ignore
     }
   };
 
@@ -83,8 +126,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Balance sx={{ color: 'primary.main', fontSize: 28 }} />
         {!collapsed && (
           <Typography variant="h6" sx={{ letterSpacing: '-0.02em', fontFamily: '"Montserrat",sans-serif' }}>
-            <Box component="span" sx={{ fontWeight: 400 }}>Avukat</Box>
-            <Box component="span" sx={{ fontWeight: 700 }}>Katip</Box>
+            <Box component="span" sx={{ fontWeight: 700 }}>Avu</Box>
+            <Box component="span" sx={{ fontWeight: 400 }}>katip</Box>
           </Typography>
         )}
       </Toolbar>
@@ -97,7 +140,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <ListItemButton
                 selected={active}
                 onClick={() => { router.push(item.path); if (isMobile) setMobileOpen(false); }}
-                sx={{ borderRadius: 2.5, minHeight: 48, justifyContent: collapsed ? 'center' : 'initial', px: collapsed ? 2 : 2.5 }}
+                sx={{
+                  borderRadius: 2.5,
+                  minHeight: 48,
+                  justifyContent: collapsed ? 'center' : 'initial',
+                  px: collapsed ? 2 : 2.5,
+                  ...(active && {
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                    '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.15) },
+                  }),
+                }}
               >
                 <ListItemIcon sx={{ minWidth: 0, mr: collapsed ? 0 : 2, justifyContent: 'center', color: active ? 'primary.main' : 'text.secondary' }}>
                   {item.icon}
@@ -147,11 +199,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </IconButton>
             )}
             <Typography variant="subtitle1" sx={{ color: 'text.secondary', flexGrow: 1 }}>
-              {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'AvukatKatip'}
+              {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'Avukatip'}
             </Typography>
             <ThemeToggle />
             <IconButton onClick={(e) => setNotifAnchorEl(e.currentTarget)} sx={{ color: 'text.secondary' }}>
-              <Badge badgeContent={notifications.filter((n) => !n.read).length} color="error"><Notifications /></Badge>
+              <Badge badgeContent={notifications.filter((n) => !n.is_read).length} color="error"><Notifications /></Badge>
             </IconButton>
             <Menu
               anchorEl={notifAnchorEl}
@@ -166,29 +218,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Bildirimler</Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {notifications.filter((n) => !n.read).length} okunmamış
+                  {notifications.filter((n) => !n.is_read).length} okunmamış
                 </Typography>
               </Box>
               <Divider />
               {notifications.map((n) => (
                 <MenuItem
                   key={n.id}
-                  onClick={() => handleNotifClick(n.id, n.path)}
+                  onClick={() => handleNotifClick(n.id)}
                   sx={{
                     py: 1.5,
                     px: 2,
-                    bgcolor: n.read ? 'inherit' : 'action.hover',
+                    bgcolor: n.is_read ? 'inherit' : 'action.hover',
                     borderLeft: 3,
-                    borderColor: n.read ? 'transparent' : 'primary.main',
-                    cursor: n.path ? 'pointer' : 'default',
+                    borderColor: n.is_read ? 'transparent' : 'primary.main',
                   }}
                 >
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: n.read ? 400 : 600, lineHeight: 1.4 }}>
-                      {n.text}
+                    <Typography variant="body2" sx={{ fontWeight: n.is_read ? 400 : 600, lineHeight: 1.4 }}>
+                      {n.title}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {n.time}
+                    {n.message && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        {n.message}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                      {formatRelativeTime(n.created_at)}
                     </Typography>
                   </Box>
                 </MenuItem>
@@ -217,7 +273,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Typography>
               </Box>
               <Divider />
-              <MenuItem onClick={() => { setAnchorEl(null); router.push('/profil'); }}>
+              <MenuItem onClick={() => { setAnchorEl(null); router.push('/settings'); }}>
                 <Settings sx={{ mr: 1.5, fontSize: 18, color: 'text.secondary' }} /> Ayarlar
               </MenuItem>
               <MenuItem onClick={() => { setAnchorEl(null); handleLogout(); }}>
@@ -227,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ p: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 64px)' }}>
+        <Box component="main" sx={{ p: { xs: 2, md: 4 }, minHeight: 'calc(100vh - 64px)' }}>
           {children}
         </Box>
       </Box>

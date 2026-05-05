@@ -17,6 +17,15 @@ export const metadata: Metadata = {
   title: "Avukatip - Avukatip Platformu",
   description:
     "Avukatip ile avukatınızdan randevu alın, dava dosyalarınızı takip edin ve avukatınızla güvenli mesajlaşın.",
+  icons: {
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+    shortcut: '/favicon.ico',
+  },
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({
@@ -27,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
       <body className={montserrat.variable} style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}>
-        <InitColorSchemeScript attribute="class" />
+        <InitColorSchemeScript attribute="class" defaultMode="light" />
         <AppRouterCacheProvider>
           <Providers>
             <AuthProvider>{children}</AuthProvider>

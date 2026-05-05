@@ -1,52 +1,44 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+const INVALID_CODE_MESSAGE = 'Gecersiz veya suresi dolmus kod.';
+
 export async function POST(req: Request) {
   try {
-    const { email, otp } = await req.json();
+    const { email: rawEmail, otp: rawOtp } = await req.json();
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+    const otp = typeof rawOtp === 'string' ? rawOtp.trim() : '';
 
-    if (!email || !otp) {
-      return NextResponse.json(
-        { error: 'E-posta ve OTP kodu gereklidir' },
-        { status: 400 }
-      );
+    if (!email || !/^\d{6}$/.test(otp)) {
+      return NextResponse.json({ error: INVALID_CODE_MESSAGE }, { status: 400 });
     }
 
     const supabaseAdmin = createAdminClient();
 
-    const { data: profile } = await supabaseAdmin
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id, email_verified, verification_otp, verification_otp_expires')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
-    if (!profile) {
-      return NextResponse.json(
-        { error: 'Geçersiz veya süresi dolmuş kod.' },
-        { status: 400 }
-      );
+    if (profileError) {
+      console.error('Verify OTP profile lookup error:', profileError);
+      return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 });
     }
 
-    if (profile.email_verified) {
-      return NextResponse.json(
-        { error: 'E-posta adresi zaten doğrulanmış.' },
-        { status: 400 }
-      );
+    if (profile?.email_verified) {
+      return NextResponse.json({ success: true, message: 'E-posta adresiniz dogrulandi.' });
     }
 
     if (
-      !profile.verification_otp ||
+      !profile?.verification_otp ||
       profile.verification_otp !== otp ||
       !profile.verification_otp_expires ||
       new Date(profile.verification_otp_expires) < new Date()
     ) {
-      return NextResponse.json(
-        { error: 'Geçersiz veya süresi dolmuş kod.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: INVALID_CODE_MESSAGE }, { status: 400 });
     }
 
-    // Confirm email in Supabase
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       profile.id,
       { email_confirm: true }
@@ -54,14 +46,10 @@ export async function POST(req: Request) {
 
     if (updateError) {
       console.error('Supabase confirm error:', updateError);
-      return NextResponse.json(
-        { error: 'E-posta doğrulama hatası' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'E-posta dogrulama hatasi' }, { status: 500 });
     }
 
-    // Mark profile as verified and clear OTP
-    await supabaseAdmin
+    const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .update({
         email_verified: true,
@@ -70,15 +58,14 @@ export async function POST(req: Request) {
       })
       .eq('id', profile.id);
 
-    return NextResponse.json({
-      success: true,
-      message: 'E-posta adresiniz başarıyla doğrulandı.',
-    });
-  } catch (error: any) {
+    if (profileUpdateError) {
+      console.error('Verify OTP profile update error:', profileUpdateError);
+      return NextResponse.json({ error: 'E-posta dogrulama hatasi' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: 'E-posta adresiniz dogrulandi.' });
+  } catch (error) {
     console.error('Verify OTP error:', error);
-    return NextResponse.json(
-      { error: 'Sunucu hatası' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 });
   }
 }

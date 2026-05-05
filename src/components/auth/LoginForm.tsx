@@ -103,15 +103,23 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
         size="large"
         onClick={handleLogin}
         disabled={loading}
-        sx={{
-          bgcolor: 'primary.dark',
-          color: '#fff',
-          py: 1.5,
-          '&:hover': {
-            bgcolor: 'primary.main',
-            boxShadow: '0 4px 16px rgba(30,58,95,0.3)',
+        sx={[
+          {
+            bgcolor: 'primary.dark',
+            color: 'primary.contrastText',
+            py: 1.5,
+            '&:hover': {
+              bgcolor: 'primary.main',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            },
           },
-        }}
+          (theme) =>
+            theme.applyStyles('dark', {
+              '&:hover': {
+                boxShadow: '0 4px 16px rgba(255,255,255,0.08)',
+              },
+            }),
+        ]}
       >
         {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
       </Button>
