@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import {
-  Box, Card, CardContent, Typography, TextField, Chip, Table,
-  TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  IconButton, Menu, MenuItem,
+  Box, Card, Typography, TextField, Chip, Table,
+  TableBody, TableCell, TableContainer, TableHead, TableRow,
+  IconButton, Menu, MenuItem, Divider,
 } from '@mui/material';
-import { Search, MoreVert, Balance, Person, AdminPanelSettings } from '@mui/icons-material';
+import { Search, MoreVert, Balance, Person, AdminPanelSettings, Delete } from '@mui/icons-material';
 
 interface UsersClientProps {
   users: any[];
@@ -16,22 +15,71 @@ interface UsersClientProps {
 
 export default function UsersClient({ users }: UsersClientProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [search, setSearch] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [loadingAction, setLoadingAction] = useState(false);
 
   const filtered = users.filter((u) => {
     const q = search.toLowerCase();
     return u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.role?.toLowerCase().includes(q);
   });
 
-  const handleRoleChange = async (role: string) => {
-    if (!selectedUser) return;
-    await supabase.from('profiles').update({ role }).eq('id', selectedUser.id);
+  const closeMenu = () => {
     setAnchorEl(null);
     setSelectedUser(null);
-    router.refresh();
+  };
+
+  const handleRoleChange = async (role: string) => {
+    if (!selectedUser || loadingAction) return;
+    setLoadingAction(true);
+
+    try {
+      const res = await fetch('/api/admin/role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUser.id, role }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Rol güncellenemedi');
+
+      closeMenu();
+      router.refresh();
+    } catch (error: any) {
+      window.alert(error.message || 'Rol güncellenemedi');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser || loadingAction) return;
+
+    const confirmed = window.confirm(
+      `${selectedUser.full_name ?? selectedUser.email ?? 'Bu kullanıcı'} silinsin mi? Bu işlem kullanıcı hesabını ve ilişkili kayıtları kaldırır.`
+    );
+    if (!confirmed) return;
+
+    setLoadingAction(true);
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUser.id }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Kullanıcı silinemedi');
+
+      closeMenu();
+      router.refresh();
+    } catch (error: any) {
+      window.alert(error.message || 'Kullanıcı silinemedi');
+    } finally {
+      setLoadingAction(false);
+    }
   };
 
   return (
@@ -92,10 +140,15 @@ export default function UsersClient({ users }: UsersClientProps) {
         </Table>
       </TableContainer>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        <MenuItem onClick={() => handleRoleChange('client')}>Müvekkil Yap</MenuItem>
-        <MenuItem onClick={() => handleRoleChange('lawyer')}>Avukat Yap</MenuItem>
-        <MenuItem onClick={() => handleRoleChange('admin')}>Admin Yap</MenuItem>
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={closeMenu}>
+        <MenuItem disabled={loadingAction} onClick={() => handleRoleChange('client')}>Müvekkil Yap</MenuItem>
+        <MenuItem disabled={loadingAction} onClick={() => handleRoleChange('lawyer')}>Avukat Yap</MenuItem>
+        <MenuItem disabled={loadingAction} onClick={() => handleRoleChange('admin')}>Admin Yap</MenuItem>
+        <Divider />
+        <MenuItem disabled={loadingAction} onClick={handleDeleteUser} sx={{ color: 'error.main' }}>
+          <Delete sx={{ fontSize: 18, mr: 1 }} />
+          Kullanıcıyı Sil
+        </MenuItem>
       </Menu>
     </Box>
   );

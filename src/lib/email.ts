@@ -3,7 +3,6 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
 export function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -31,7 +30,7 @@ function wrapEmailBody(title: string, bodyContent: string, isOtp = false, otpCod
             <td style="padding: 32px 48px;">
               <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #111827; text-align: center;">${title}</h1>
               ${isOtp ? `
-              <p style="margin: 0 0 32px 0; color: #4b5563; text-align: center; font-size: 16px;">${bodyContent}</p>
+              <div style="margin: 0 0 32px 0; color: #4b5563; text-align: center; font-size: 16px;">${bodyContent}</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
                 <tr>
                   <td align="center">
@@ -66,15 +65,24 @@ function wrapEmailBody(title: string, bodyContent: string, isOtp = false, otpCod
 </html>`;
 }
 
-export async function sendVerificationOTP(email: string, otp: string) {
+export async function sendVerificationOTP(email: string, otp: string, referenceCode?: string | null) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set');
     return;
   }
 
+  const referenceCodeHtml = referenceCode
+    ? `
+      <div style="margin: 18px 0 0 0; padding: 16px; border: 1px solid #dbeafe; border-radius: 12px; background-color: #f8fbff; text-align: center;">
+        <p style="margin: 0 0 8px 0; color: #4b5563; font-size: 14px;">Müvekkillerinizin sizi bulması için referans kodunuz:</p>
+        <strong style="font-size: 24px; color: #1E3A5F; letter-spacing: 2px;">${referenceCode}</strong>
+      </div>
+    `
+    : '';
+
   const html = wrapEmailBody(
     'E-posta Doğrulama',
-    'Avukatip\'e kayıt olduğunuz için teşekkürler! Kaydınızı tamamlamak için aşağıdaki doğrulama kodunu kullanın.',
+    `Avukatip'e kayıt olduğunuz için teşekkürler! Kaydınızı tamamlamak için aşağıdaki doğrulama kodunu kullanın.${referenceCodeHtml}`,
     true,
     otp
   );
@@ -82,7 +90,7 @@ export async function sendVerificationOTP(email: string, otp: string) {
   const { data, error } = await resend.emails.send({
     from: SENDER_EMAIL,
     to: email,
-    subject: 'Avukatip - Doğrulama Kodunuz',
+    subject: referenceCode ? 'Avukatip - Doğrulama Kodunuz ve Referans Kodunuz' : 'Avukatip - Doğrulama Kodunuz',
     html,
   });
 
@@ -91,5 +99,5 @@ export async function sendVerificationOTP(email: string, otp: string) {
     throw new Error(error.message);
   }
 
-  console.log(`📧 OTP sent to ${email}, id: ${data?.id}`);
+  console.log(`OTP sent to ${email}, id: ${data?.id}`);
 }

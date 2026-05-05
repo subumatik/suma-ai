@@ -43,11 +43,11 @@ model Category {
   name        String
   color       String   @default("#3B82F6")
   icon        String   @default("Folder")
-  created_by  String   @db.Uuid
+  created_by  String?  @db.Uuid
   is_system   Boolean  @default(false)
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  creator     Profile  @relation(fields: [created_by], references: [id])
+  creator     Profile? @relation(fields: [created_by], references: [id], onDelete: SetNull)
   dosyalar    Dosya[]
 
   @@map("categories")
@@ -59,11 +59,11 @@ model Status {
   color       String   @default("#3B82F6")
   order       Int      @default(0)
   is_default  Boolean  @default(false)
-  created_by  String   @db.Uuid
+  created_by  String?  @db.Uuid
   is_system   Boolean  @default(false)
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  creator     Profile  @relation(fields: [created_by], references: [id])
+  creator     Profile? @relation(fields: [created_by], references: [id], onDelete: SetNull)
   dosyalar    Dosya[]
   statusUpdates DosyaStatusUpdate[]
 
@@ -84,9 +84,9 @@ model Dosya {
   created_at     DateTime @default(now()) @db.Timestamptz(6)
   updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  lawyer         Profile  @relation("LawyerDosyalar", fields: [lawyer_id], references: [id])
-  client         Profile  @relation("ClientDosyalar", fields: [client_id], references: [id])
-  category       Category? @relation(fields: [category_id], references: [id])
+  lawyer         Profile  @relation("LawyerDosyalar", fields: [lawyer_id], references: [id], onDelete: Cascade)
+  client         Profile  @relation("ClientDosyalar", fields: [client_id], references: [id], onDelete: Cascade)
+  category       Category? @relation(fields: [category_id], references: [id], onDelete: SetNull)
   status         Status   @relation(fields: [status_id], references: [id])
   documents      DosyaDocument[]
   statusUpdates  DosyaStatusUpdate[]
@@ -107,7 +107,7 @@ model DosyaDocument {
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
   dosya       Dosya    @relation(fields: [dosya_id], references: [id], onDelete: Cascade)
-  uploader    Profile  @relation(fields: [uploaded_by], references: [id])
+  uploader    Profile  @relation(fields: [uploaded_by], references: [id], onDelete: Cascade)
 
   @@map("dosya_documents")
 }
@@ -123,7 +123,7 @@ model DosyaStatusUpdate {
 
   dosya       Dosya    @relation(fields: [dosya_id], references: [id], onDelete: Cascade)
   status      Status   @relation(fields: [status_id], references: [id])
-  updater     Profile  @relation(fields: [updated_by], references: [id])
+  updater     Profile  @relation(fields: [updated_by], references: [id], onDelete: Cascade)
 
   @@map("dosya_status_updates")
 }
@@ -140,8 +140,8 @@ model Appointment {
   created_at       DateTime          @default(now()) @db.Timestamptz(6)
   updated_at       DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
 
-  lawyer           Profile           @relation("LawyerAppointments", fields: [lawyer_id], references: [id])
-  client           Profile           @relation("ClientAppointments", fields: [client_id], references: [id])
+  lawyer           Profile           @relation("LawyerAppointments", fields: [lawyer_id], references: [id], onDelete: Cascade)
+  client           Profile           @relation("ClientAppointments", fields: [client_id], references: [id], onDelete: Cascade)
 
   @@map("appointments")
 }
@@ -164,8 +164,8 @@ model Message {
   is_read     Boolean  @default(false)
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  sender      Profile  @relation("SentMessages", fields: [sender_id], references: [id])
-  receiver    Profile  @relation("ReceivedMessages", fields: [receiver_id], references: [id])
+  sender      Profile  @relation("SentMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver    Profile  @relation("ReceivedMessages", fields: [receiver_id], references: [id], onDelete: Cascade)
   dosya       Dosya?   @relation(fields: [dosya_id], references: [id], onDelete: Cascade)
 
   @@map("messages")
@@ -197,7 +197,7 @@ model AuditLog {
   ip_address  String?
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  user Profile? @relation(fields: [user_id], references: [id])
+  user Profile? @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
 }
