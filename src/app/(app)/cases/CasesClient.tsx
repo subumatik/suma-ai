@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   Box, Card, CardContent, Typography, Button, TextField, Chip, Dialog,
-  DialogTitle, DialogContent, DialogActions, Grid, InputAdornment,
+  DialogTitle, DialogContent, DialogActions, Grid, InputAdornment, IconButton
 } from '@mui/material';
 import {
-  Folder, Search, Add, FilterList,
+  Folder, Search, Add, FilterList, Edit, Delete
 } from '@mui/icons-material';
 
 interface CasesClientProps {
@@ -29,6 +29,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [newDosya, setNewDosya] = useState({ title: '', description: '', file_number: '', court_name: '', court_file_no: '', client_id: '', category_id: '', status_id: '' });
+  const [editDosya, setEditDosya] = useState<any>(null);
 
   const filtered = dosyalar.filter((d) => {
     const matchesSearch = !search || d.title?.toLowerCase().includes(search.toLowerCase()) || d.file_number?.toLowerCase().includes(search.toLowerCase());
@@ -47,6 +48,31 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
     setLoading(false);
     setOpen(false);
     setNewDosya({ title: '', description: '', file_number: '', court_name: '', court_file_no: '', client_id: '', category_id: '', status_id: '' });
+    router.refresh();
+  };
+
+  const handleUpdate = async () => {
+    if (!editDosya.title || !editDosya.client_id || !editDosya.status_id) return;
+    setLoading(true);
+    await supabase.from('dosyalar').update({
+      title: editDosya.title,
+      description: editDosya.description,
+      file_number: editDosya.file_number,
+      court_name: editDosya.court_name,
+      court_file_no: editDosya.court_file_no,
+      client_id: editDosya.client_id,
+      category_id: editDosya.category_id,
+      status_id: editDosya.status_id,
+    }).eq('id', editDosya.id);
+    setLoading(false);
+    setEditDosya(null);
+    router.refresh();
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm('Bu dosyayı silmek istediğinize emin misiniz? İlgili tüm belgeler de silinecektir.')) return;
+    await supabase.from('dosyalar').delete().eq('id', id);
     router.refresh();
   };
 
@@ -115,7 +141,15 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>{d.title}</Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>{d.file_number ?? 'Dosya No: Belirtilmemiş'}</Typography>
                   </Box>
-                  <Chip size="small" label={d.status?.name ?? '-'} sx={{ bgcolor: (d.status?.color ?? '#3B82F6') + '20', color: d.status?.color ?? '#3B82F6' }} />
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <Chip size="small" label={d.status?.name ?? '-'} sx={{ bgcolor: (d.status?.color ?? '#3B82F6') + '20', color: d.status?.color ?? '#3B82F6' }} />
+                    {role === 'lawyer' && (
+                      <Box sx={{ display: 'flex' }}>
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); setEditDosya(d); }}><Edit fontSize="small" /></IconButton>
+                        <IconButton size="small" color="error" onClick={(e) => handleDelete(e, d.id)}><Delete fontSize="small" /></IconButton>
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
                 {d.category?.name && (
                   <Chip size="small" label={d.category.name} sx={{ bgcolor: (d.category.color ?? '#3B82F6') + '15', color: d.category.color ?? '#3B82F6', mb: 1.5 }} />
@@ -157,7 +191,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
             fullWidth
             value={newDosya.client_id}
             onChange={(e) => setNewDosya({ ...newDosya, client_id: e.target.value })}
-            slotProps={{ select: { native: true } }}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
           >
             <option value="">Seçiniz</option>
             {clients.map((c) => (
@@ -170,7 +204,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
             fullWidth
             value={newDosya.category_id}
             onChange={(e) => setNewDosya({ ...newDosya, category_id: e.target.value })}
-            slotProps={{ select: { native: true } }}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
           >
             <option value="">Seçiniz</option>
             {categories.map((c) => (
@@ -183,7 +217,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
             fullWidth
             value={newDosya.status_id}
             onChange={(e) => setNewDosya({ ...newDosya, status_id: e.target.value })}
-            slotProps={{ select: { native: true } }}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
           >
             {statuses.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
@@ -196,6 +230,61 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
           <Button onClick={() => setOpen(false)}>İptal</Button>
           <Button variant="contained" onClick={handleCreate} disabled={loading || !newDosya.title || !newDosya.client_id || !newDosya.status_id}>
             Oluştur
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!editDosya} onClose={() => setEditDosya(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Dosyayı Düzenle</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <TextField label="Dosya Başlığı" fullWidth value={editDosya?.title || ''} onChange={(e) => setEditDosya({ ...editDosya, title: e.target.value })} />
+          <TextField label="Açıklama" fullWidth multiline rows={2} value={editDosya?.description || ''} onChange={(e) => setEditDosya({ ...editDosya, description: e.target.value })} />
+          <TextField label="Dosya Numarası" fullWidth value={editDosya?.file_number || ''} onChange={(e) => setEditDosya({ ...editDosya, file_number: e.target.value })} />
+          <TextField
+            select
+            label="Müvekkil"
+            fullWidth
+            value={editDosya?.client_id || ''}
+            onChange={(e) => setEditDosya({ ...editDosya, client_id: e.target.value })}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+          >
+            <option value="">Seçiniz</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.full_name}</option>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Kategori"
+            fullWidth
+            value={editDosya?.category_id || ''}
+            onChange={(e) => setEditDosya({ ...editDosya, category_id: e.target.value })}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+          >
+            <option value="">Seçiniz</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Durum"
+            fullWidth
+            value={editDosya?.status_id || ''}
+            onChange={(e) => setEditDosya({ ...editDosya, status_id: e.target.value })}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+          >
+            {statuses.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </TextField>
+          <TextField label="Mahkeme" fullWidth value={editDosya?.court_name || ''} onChange={(e) => setEditDosya({ ...editDosya, court_name: e.target.value })} />
+          <TextField label="Mahkeme Dosya No" fullWidth value={editDosya?.court_file_no || ''} onChange={(e) => setEditDosya({ ...editDosya, court_file_no: e.target.value })} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDosya(null)}>İptal</Button>
+          <Button variant="contained" onClick={handleUpdate} disabled={loading || !editDosya?.title || !editDosya?.client_id || !editDosya?.status_id}>
+            Güncelle
           </Button>
         </DialogActions>
       </Dialog>

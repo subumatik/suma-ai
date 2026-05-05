@@ -1,28 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { PrismaClient } from '@/generated/prisma';
-
-const prisma = new PrismaClient();
 
 export async function PATCH(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const profile = await prisma.profile.findUnique({
-    where: { email: user.email },
-  });
-  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    const { id } = await params;
+    let userId = user.id;
 
-  const { id } = await params;
+    if (user.email) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+        
+      if (profile) {
+        userId = profile.id;
+      }
+    }
 
-  const notification = await prisma.notification.updateMany({
-    where: { id, user_id: profile.id },
-    data: { is_read: true },
-  });
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', id)
+      .eq('user_id', userId);
 
-  return NextResponse.json({ success: true, count: notification.count });
+    if (error) {
+      console.error('Error updating notification:', error);
+      return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('Notification read error:', err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }

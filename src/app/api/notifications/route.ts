@@ -1,24 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { PrismaClient } from '@/generated/prisma';
-
-const prisma = new PrismaClient();
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const profile = await prisma.profile.findUnique({
-    where: { email: user.email },
-  });
-  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    let userId = user.id;
+    
+    // Try to get profile ID if it exists and uses email mapping
+    if (user.email) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+        
+      if (profile) {
+        userId = profile.id;
+      }
+    }
 
-  const notifications = await prisma.notification.findMany({
-    where: { user_id: profile.id },
-    orderBy: { created_at: 'desc' },
-    take: 20,
-  });
+    // Fetch notifications
+    const { data: notifications, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-  return NextResponse.json(notifications);
+    if (error) {
+      console.error('Notifications fetch error:', error.message);
+      return NextResponse.json([]); // Return empty to prevent 500 spam
+    }
+
+    return NextResponse.json(notifications || []);
+  } catch (error) {
+    console.error('Notifications route error:', error);
+    return NextResponse.json([]); // Safe fallback
+  }
 }

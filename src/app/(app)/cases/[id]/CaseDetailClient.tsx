@@ -10,8 +10,10 @@ import {
 } from '@mui/material';
 import {
   Folder, CheckCircle, Download, Upload, Send, Schedule, Gavel, Description,
-  ChatBubble, SmartToy,
+  ChatBubble, SmartToy, Delete, Edit, AutoAwesome
 } from '@mui/icons-material';
+import DocumentUpload from '@/components/DocumentUpload';
+import ChatInterface from '@/components/ChatInterface';
 
 interface Props {
   dosya: any;
@@ -35,11 +37,24 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   const [openStatusDialog, setOpenStatusDialog] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [docToRename, setDocToRename] = useState<any>(null);
+  const [newDocName, setNewDocName] = useState('');
 
-  // AI Asistan state
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiAnswer, setAiAnswer] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
+  const handleRenameDocument = async () => {
+    if (!newDocName.trim() || !docToRename) return;
+    await supabase.from('dosya_documents').update({ file_name: newDocName }).eq('id', docToRename.id);
+    setDocToRename(null);
+    setNewDocName('');
+    router.refresh();
+  };
+
+  const handleDeleteDocument = async (docId: string, filePath: string) => {
+    if (!confirm('Bu dosyayı silmek istediğinize emin misiniz?')) return;
+    if (filePath) await supabase.storage.from('case-documents').remove([filePath]);
+    await supabase.from('dosya_documents').delete().eq('id', docId);
+    router.refresh();
+  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
@@ -67,54 +82,6 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
     setStatusDesc('');
     setHearingDate('');
     router.refresh();
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-
-    const formData = new FormData();
-    formData.append('dosyaId', dosya.id);
-    formData.append('file', file);
-
-    const response = await fetch('/api/documents/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => null);
-      setUploading(false);
-      alert(data?.error ?? 'Yukleme hatasi');
-      return;
-    }
-
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    router.refresh();
-  };
-
-  const handleAiAsk = async () => {
-    if (!aiQuestion.trim()) return;
-    setAiLoading(true);
-    setAiAnswer('');
-    try {
-      const res = await fetch('/api/ai/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dosyaId: dosya.id, question: aiQuestion.trim() }),
-      });
-      const data = await res.json();
-      if (data.answer) {
-        setAiAnswer(data.answer);
-      } else {
-        setAiAnswer(data.error ?? 'Bir hata oluştu.');
-      }
-    } catch (err: any) {
-      setAiAnswer('Bağlantı hatası: ' + err.message);
-    }
-    setAiLoading(false);
   };
 
   return (
@@ -171,28 +138,21 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="Belgeler" icon={<Description sx={{ fontSize: 18 }} />} iconPosition="start" />
         <Tab label="Durum Geçmişi" icon={<Schedule sx={{ fontSize: 18 }} />} iconPosition="start" />
-        <Tab label="Mesajlar" icon={<ChatBubble sx={{ fontSize: 18 }} />} iconPosition="start" />
+        <Tab label="Notlar" icon={<ChatBubble sx={{ fontSize: 18 }} />} iconPosition="start" />
         <Tab label="AI Asistan" icon={<SmartToy sx={{ fontSize: 18 }} />} iconPosition="start" />
       </Tabs>
 
       {tab === 0 && (
         <Card>
           <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>Dosya Belgeleri</Typography>
-              <Button variant="outlined" startIcon={<Upload />} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                {uploading ? 'Yükleniyor...' : 'Belge Yükle'}
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                accept="application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={handleFileUpload}
-              />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Dosya Belgeleri</Typography>
+            
+            <Box sx={{ mb: 4 }}>
+              <DocumentUpload caseId={dosya.id} onUploadSuccess={() => router.refresh()} />
             </Box>
+
             {documents.length === 0 ? (
-              <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz belge bulunmuyor.</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz yüklenmiş belge bulunmuyor.</Typography>
             ) : (
               <List>
                 {documents.map((d) => (
@@ -202,9 +162,21 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
                       primary={d.file_name}
                       secondary={`${d.uploader?.full_name ?? 'Bilinmiyor'} · ${new Date(d.created_at).toLocaleDateString('tr-TR')}`}
                     />
-                    <IconButton href={`/api/documents/${d.id}/download`}>
-                      <Download />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton href={`/api/documents/${d.id}/download`} title="İndir">
+                        <Download />
+                      </IconButton>
+                      {role !== 'client' && (
+                        <>
+                          <IconButton onClick={() => { setDocToRename(d); setNewDocName(d.file_name); }} title="Yeniden Adlandır">
+                            <Edit />
+                          </IconButton>
+                          <IconButton onClick={() => handleDeleteDocument(d.id, d.file_url)} title="Sil" color="error">
+                            <Delete />
+                          </IconButton>
+                        </>
+                      )}
+                    </Box>
                   </ListItem>
                 ))}
               </List>
@@ -249,10 +221,10 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       {tab === 2 && (
         <Card>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Dosya Mesajları</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Dosya Notları</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto', mb: 2, p: 1 }}>
               {messages.length === 0 ? (
-                <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>Henüz mesaj bulunmuyor.</Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>Henüz not bulunmuyor.</Typography>
               ) : (
                 messages.map((m) => (
                   <Box key={m.id} sx={{ alignSelf: m.sender_id === userId ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
@@ -268,7 +240,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
               )}
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <TextField fullWidth placeholder="Mesajınızı yazın..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
+              <TextField fullWidth placeholder="Notunuzu yazın..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} size="small" multiline maxRows={3} />
               <Button variant="contained" onClick={handleSendMessage} disabled={!newMessage.trim()}><Send sx={{ fontSize: 18 }} /></Button>
             </Box>
@@ -277,39 +249,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       )}
 
       {tab === 3 && (
-        <Card>
-          <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-              <SmartToy sx={{ color: 'primary.main', fontSize: 32 }} />
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>AI Asistan</Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Dosyanız hakkında soru sorun, Claude analiz etsin</Typography>
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-              <TextField
-                fullWidth
-                placeholder="Örn: Bu dosyada eksik evrak var mı?"
-                value={aiQuestion}
-                onChange={(e) => setAiQuestion(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAiAsk(); } }}
-                multiline
-                maxRows={3}
-              />
-              <Button variant="contained" onClick={handleAiAsk} disabled={aiLoading || !aiQuestion.trim()}>
-                {aiLoading ? 'Düşünüyor...' : 'Sor'}
-              </Button>
-            </Box>
-
-            {aiAnswer && (
-              <Paper sx={{ p: 3, borderRadius: 2, bgcolor: 'action.hover', border: 1, borderColor: 'divider' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>Claude Yanıtı</Typography>
-                <Typography variant="body2" sx={{ lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{aiAnswer}</Typography>
-              </Paper>
-            )}
-          </CardContent>
-        </Card>
+        <ChatInterface caseId={dosya.id} />
       )}
 
       <Dialog open={openStatusDialog} onClose={() => setOpenStatusDialog(false)} maxWidth="sm" fullWidth>
@@ -328,6 +268,22 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
         <DialogActions>
           <Button onClick={() => setOpenStatusDialog(false)}>İptal</Button>
           <Button variant="contained" onClick={handleStatusUpdate}>Güncelle</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={!!docToRename} onClose={() => setDocToRename(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Belgeyi Yeniden Adlandır</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <TextField 
+            fullWidth 
+            label="Belge Adı" 
+            value={newDocName} 
+            onChange={(e) => setNewDocName(e.target.value)} 
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDocToRename(null)}>İptal</Button>
+          <Button variant="contained" onClick={handleRenameDocument} disabled={!newDocName.trim()}>Kaydet</Button>
         </DialogActions>
       </Dialog>
     </Box>
