@@ -21,10 +21,17 @@ export default async function MessagesPage() {
     connectedUserIds = [...new Set((dosyalar ?? []).map((d) => d.client_id).filter(Boolean))];
   }
 
+  // Fetch connected lawyers through lawyer_connections
+  if (role === 'lawyer') {
+    const { data: conns } = await supabase.from('lawyer_connections').select('lawyer_a_id, lawyer_b_id').or(`lawyer_a_id.eq.${user.id},lawyer_b_id.eq.${user.id}`);
+    const lawyerConnIds = (conns ?? []).map((c) => (c.lawyer_a_id === user.id ? c.lawyer_b_id : c.lawyer_a_id));
+    connectedUserIds = [...new Set([...connectedUserIds, ...lawyerConnIds])];
+  }
+
   const [{ data: messages }, { data: connectedUsers }] = await Promise.all([
     supabase.from('messages').select('*, sender:sender_id(full_name), receiver:receiver_id(full_name)').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(200),
     connectedUserIds.length > 0
-      ? supabase.from('profiles').select('id, full_name, role, specialization, baro_number').in('id', connectedUserIds)
+      ? supabase.from('profiles').select('id, full_name, role, specialization, baro_number, referans_kodu').in('id', connectedUserIds)
       : Promise.resolve({ data: [] }),
   ]);
 

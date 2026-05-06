@@ -12,6 +12,7 @@ export default async function DashboardPage() {
 
   let dosyalar: any[] = [];
   let appointments: any[] = [];
+  let hearings: any[] = [];
   let unreadMessages = 0;
   let totalUsers = 0;
   let totalDosyalar = 0;
@@ -31,6 +32,11 @@ export default async function DashboardPage() {
     unreadMessages = um ?? 0;
     categories = cat ?? [];
     statuses = st ?? [];
+    const hearingDosyaIds = dosyalar.map((d) => d.id);
+    if (hearingDosyaIds.length > 0) {
+      const { data: h } = await supabase.from('hearings').select('*, dosya:dosya_id(title)').in('dosya_id', hearingDosyaIds).gte('hearing_date', new Date().toISOString()).order('hearing_date', { ascending: true }).limit(5);
+      hearings = h ?? [];
+    }
   } else if (role === 'client') {
     const [{ data: d }, { data: a }, { count: um }, { data: cat }, { data: st }] = await Promise.all([
       supabase.from('dosyalar').select('*, lawyer:lawyer_id(full_name), category:category_id(name,color), status:status_id(name,color)').eq('client_id', user.id).order('updated_at', { ascending: false }).limit(5),
@@ -44,6 +50,11 @@ export default async function DashboardPage() {
     unreadMessages = um ?? 0;
     categories = cat ?? [];
     statuses = st ?? [];
+    const hearingDosyaIds = dosyalar.map((d) => d.id);
+    if (hearingDosyaIds.length > 0) {
+      const { data: h } = await supabase.from('hearings').select('*, dosya:dosya_id(title)').in('dosya_id', hearingDosyaIds).gte('hearing_date', new Date().toISOString()).order('hearing_date', { ascending: true }).limit(5);
+      hearings = h ?? [];
+    }
   } else if (role === 'admin') {
     const [{ count: tu }, { count: td }, { data: d }, { data: cat }, { data: st }] = await Promise.all([
       supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -65,6 +76,7 @@ export default async function DashboardPage() {
       profile={profile}
       dosyalar={dosyalar}
       appointments={appointments}
+      hearings={hearings}
       unreadMessages={unreadMessages}
       totalUsers={totalUsers}
       totalDosyalar={totalDosyalar}

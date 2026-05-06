@@ -7,13 +7,17 @@ import {
   Box, Card, CardContent, Typography, Button, Chip, Tabs, Tab, TextField,
   List, ListItem, ListItemIcon, ListItemText, IconButton, Divider, Avatar,
   Paper, Dialog, DialogTitle, DialogContent, DialogActions, Grid,
+  Snackbar, Alert,
 } from '@mui/material';
 import {
   Folder, CheckCircle, Download, Upload, Send, Schedule, Gavel, Description,
-  ChatBubble, SmartToy, Delete, Edit, AutoAwesome
+  ChatBubble, SmartToy, Delete, Edit, AutoAwesome, Add, Calculate,
+  NotificationsActive,
 } from '@mui/icons-material';
 import DocumentUpload from '@/components/DocumentUpload';
 import ChatInterface from '@/components/ChatInterface';
+import EnforcementCalculator from '@/components/EnforcementCalculator';
+import YargitaySearch from '@/components/YargitaySearch';
 
 interface Props {
   dosya: any;
@@ -22,12 +26,13 @@ interface Props {
   messages: any[];
   statuses: any[];
   categories: any[];
+  hearings: any[];
   role: string;
   userId: string;
   userName: string;
 }
 
-export default function CaseDetailClient({ dosya, documents, statusUpdates, messages: initialMessages, statuses, categories, role, userId, userName }: Props) {
+export default function CaseDetailClient({ dosya, documents, statusUpdates, messages: initialMessages, statuses, categories, hearings: initialHearings, role, userId, userName }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [tab, setTab] = useState(0);
@@ -39,9 +44,16 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState(initialMessages);
-  
+
   const [docToRename, setDocToRename] = useState<any>(null);
   const [newDocName, setNewDocName] = useState('');
+
+  // Hearings state
+  const [hearings, setHearings] = useState(initialHearings);
+  const [openHearingDialog, setOpenHearingDialog] = useState(false);
+  const [newHearing, setNewHearing] = useState({ hearing_date: '', court_name: '', description: '', reminder_days_before: '' });
+  const [hearingLoading, setHearingLoading] = useState(false);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     const channel = supabase
@@ -60,6 +72,10 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [supabase, dosya.id]);
+
+  const showToast = (message: string, severity: 'success' | 'error' = 'success') => {
+    setToast({ open: true, message, severity });
+  };
 
   const handleRenameDocument = async () => {
     if (!newDocName.trim() || !docToRename) return;
@@ -103,6 +119,66 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
     router.refresh();
   };
 
+  // Hearing handlers
+  const handleCreateHearing = async () => {
+    if (!newHearing.hearing_date) {
+      showToast('Duruşma tarihi zorunludur.', 'error');
+      return;
+    }
+    setHearingLoading(true);
+    try {
+      const res = await fetch('/api/hearings/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dosya_id: dosya.id,
+          hearing_date: new Date(newHearing.hearing_date).toISOString(),
+          court_name: newHearing.court_name,
+          description: newHearing.description,
+          reminder_days_before: newHearing.reminder_days_before ? parseInt(newHearing.reminder_days_before) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Duruşma eklenemedi');
+      setHearings((prev) => [...prev, data.hearing].sort((a, b) => new Date(a.hearing_date).getTime() - new Date(b.hearing_date).getTime()));
+      setOpenHearingDialog(false);
+      setNewHearing({ hearing_date: '', court_name: '', description: '', reminder_days_before: '' });
+      showToast('Duruşma eklendi.');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setHearingLoading(false);
+    }
+  };
+
+  const handleDeleteHearing = async (id: string) => {
+    if (!confirm('Bu duruşmayı silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`/api/hearings/delete?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Silinemedi');
+      setHearings((prev) => prev.filter((h) => h.id !== id));
+      showToast('Duruşma silindi.');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleSendReminder = async (hearingId: string) => {
+    try {
+      const res = await fetch('/api/hearings/reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hearing_id: hearingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Hatırlatma gönderilemedi');
+      showToast(`Hatırlatma e-postası gönderildi: ${data.sentTo?.join(', ')}`);
+      setHearings((prev) => prev.map((h) => (h.id === hearingId ? { ...h, reminder_email_sent: true } : h)));
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
   return (
     <Box>
       <Button onClick={() => router.push('/cases')} sx={{ mb: 2 }}>← Dosyalara Dön</Button>
@@ -111,8 +187,8 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>{dosya.title}</Typography>
-              <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1 }}>{dosya.file_number ?? 'Dosya No: Belirtilmemiş'}</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{dosya.title}</Typography>
+              <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{dosya.file_number ?? 'Dosya No: Belirtilmemiş'}</Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Chip label={dosya.status?.name ?? '-'} sx={{ bgcolor: (dosya.status?.color ?? '#3B82F6') + '20', color: dosya.status?.color ?? '#3B82F6' }} />
                 {dosya.category?.name && <Chip label={dosya.category.name} sx={{ bgcolor: (dosya.category.color ?? '#3B82F6') + '20', color: dosya.category.color ?? '#3B82F6' }} />}
@@ -148,7 +224,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
           {dosya.description && (
             <>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7 }}>{dosya.description}</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{dosya.description}</Typography>
             </>
           )}
         </CardContent>
@@ -157,7 +233,10 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="Belgeler" icon={<Description sx={{ fontSize: 18 }} />} iconPosition="start" />
         <Tab label="Durum Geçmişi" icon={<Schedule sx={{ fontSize: 18 }} />} iconPosition="start" />
+        <Tab label="Duruşmalar" icon={<Gavel sx={{ fontSize: 18 }} />} iconPosition="start" />
         <Tab label="Notlar" icon={<ChatBubble sx={{ fontSize: 18 }} />} iconPosition="start" />
+        <Tab label="Hesaplama" icon={<Calculate sx={{ fontSize: 18 }} />} iconPosition="start" />
+        <Tab label="Yargıtay" icon={<Gavel sx={{ fontSize: 18 }} />} iconPosition="start" />
         <Tab label="AI Asistan" icon={<SmartToy sx={{ fontSize: 18 }} />} iconPosition="start" />
       </Tabs>
 
@@ -165,7 +244,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
         <Card>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Dosya Belgeleri</Typography>
-            
+
             <Box sx={{ mb: 4 }}>
               <DocumentUpload caseId={dosya.id} onUploadSuccess={() => router.refresh()} />
             </Box>
@@ -240,6 +319,71 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       {tab === 2 && (
         <Card>
           <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Duruşmalar</Typography>
+              {role !== 'client' && (
+                <Button variant="contained" size="small" startIcon={<Add />} onClick={() => setOpenHearingDialog(true)}>
+                  Yeni Duruşma Ekle
+                </Button>
+              )}
+            </Box>
+
+            {hearings.length === 0 ? (
+              <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>Henüz duruşma kaydı bulunmuyor.</Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {hearings.map((h) => (
+                  <Box key={h.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', borderLeft: '4px solid', borderColor: 'warning.main' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {new Date(h.hearing_date).toLocaleString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                        {h.court_name && (
+                          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                            <strong>Mahkeme:</strong> {h.court_name}
+                          </Typography>
+                        )}
+                        {h.description && (
+                          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                            {h.description}
+                          </Typography>
+                        )}
+                        {h.reminder_days_before && (
+                          <Chip size="small" label={`${h.reminder_days_before} gün önce hatırlat`} sx={{ mt: 1 }} />
+                        )}
+                        {h.reminder_email_sent && (
+                          <Chip size="small" label="Hatırlatma gönderildi" color="success" sx={{ mt: 1, ml: 1 }} />
+                        )}
+                      </Box>
+                      {role !== 'client' && (
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<NotificationsActive />}
+                            onClick={() => handleSendReminder(h.id)}
+                            disabled={h.reminder_email_sent}
+                          >
+                            Hatırlatma Gönder
+                          </Button>
+                          <IconButton color="error" onClick={() => handleDeleteHearing(h.id)} title="Sil">
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 3 && (
+        <Card>
+          <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Dosya Notları</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto', mb: 2, p: 1 }}>
               {messages.length === 0 ? (
@@ -267,13 +411,17 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
         </Card>
       )}
 
-      {tab === 3 && (
+      {tab === 4 && <EnforcementCalculator />}
+
+      {tab === 5 && <YargitaySearch />}
+
+      {tab === 6 && (
         <ChatInterface caseId={dosya.id} userId={userId} userName={userName} />
       )}
 
       <Dialog open={openStatusDialog} onClose={() => setOpenStatusDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Durum Güncelle</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'visible' }}>
           <TextField select label="Yeni Durum" fullWidth value={newStatusId} onChange={(e) => setNewStatusId(e.target.value)}
             slotProps={{ select: { native: true } }}>
             {statuses.map((s) => (
@@ -289,14 +437,61 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
           <Button variant="contained" onClick={handleStatusUpdate}>Güncelle</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={openHearingDialog} onClose={() => setOpenHearingDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Duruşma Ekle</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'visible' }}>
+          <TextField
+            label="Duruşma Tarihi"
+            type="datetime-local"
+            fullWidth
+            value={newHearing.hearing_date}
+            onChange={(e) => setNewHearing({ ...newHearing, hearing_date: e.target.value })}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            label="Mahkeme"
+            fullWidth
+            value={newHearing.court_name}
+            onChange={(e) => setNewHearing({ ...newHearing, court_name: e.target.value })}
+          />
+          <TextField
+            label="Açıklama"
+            fullWidth
+            multiline
+            rows={2}
+            value={newHearing.description}
+            onChange={(e) => setNewHearing({ ...newHearing, description: e.target.value })}
+          />
+          <TextField
+            select
+            label="E-posta Hatırlatma"
+            fullWidth
+            value={newHearing.reminder_days_before}
+            onChange={(e) => setNewHearing({ ...newHearing, reminder_days_before: e.target.value })}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+          >
+            <option value="">Hatırlatma yok</option>
+            <option value="1">1 gün önce</option>
+            <option value="2">2 gün önce</option>
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenHearingDialog(false)}>İptal</Button>
+          <Button variant="contained" onClick={handleCreateHearing} disabled={hearingLoading}>
+            {hearingLoading ? 'Ekleniyor...' : 'Ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={!!docToRename} onClose={() => setDocToRename(null)} maxWidth="sm" fullWidth>
         <DialogTitle>Belgeyi Yeniden Adlandır</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <TextField 
-            fullWidth 
-            label="Belge Adı" 
-            value={newDocName} 
-            onChange={(e) => setNewDocName(e.target.value)} 
+        <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
+          <TextField
+            fullWidth
+            label="Belge Adı"
+            value={newDocName}
+            onChange={(e) => setNewDocName(e.target.value)}
             sx={{ mt: 1 }}
           />
         </DialogContent>
@@ -305,6 +500,10 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
           <Button variant="contained" onClick={handleRenameDocument} disabled={!newDocName.trim()}>Kaydet</Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.message}</Alert>
+      </Snackbar>
     </Box>
   );
 }

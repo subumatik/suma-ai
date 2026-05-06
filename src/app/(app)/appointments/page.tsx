@@ -21,13 +21,24 @@ export default async function AppointmentsPage() {
 
   // Fetch unique clients for lawyer
   let clients: any[] = [];
+  let hearingDosyaIds: string[] = [];
   if (role === 'lawyer') {
-    const { data: dosyalar } = await supabase.from('dosyalar').select('client_id').eq('lawyer_id', user.id);
+    const { data: dosyalar } = await supabase.from('dosyalar').select('client_id,id').eq('lawyer_id', user.id);
     const clientIds = [...new Set((dosyalar ?? []).map((d) => d.client_id).filter(Boolean))];
+    hearingDosyaIds = (dosyalar ?? []).map((d) => d.id);
     if (clientIds.length > 0) {
       const { data: clientProfiles } = await supabase.from('profiles').select('id, full_name').in('id', clientIds);
       clients = clientProfiles ?? [];
     }
+  } else if (role === 'client') {
+    const { data: dosyalar } = await supabase.from('dosyalar').select('id').eq('client_id', user.id);
+    hearingDosyaIds = (dosyalar ?? []).map((d) => d.id);
+  }
+
+  let hearings: any[] = [];
+  if (hearingDosyaIds.length > 0) {
+    const { data: h } = await supabase.from('hearings').select('*, dosya:dosya_id(title, lawyer_id, client_id)').in('dosya_id', hearingDosyaIds).order('hearing_date', { ascending: true });
+    hearings = h ?? [];
   }
 
   return (
@@ -37,6 +48,7 @@ export default async function AppointmentsPage() {
       userId={user.id}
       lawyers={lawyers ?? []}
       clients={clients}
+      hearings={hearings}
     />
   );
 }

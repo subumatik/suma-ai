@@ -17,6 +17,7 @@
     "@mui/icons-material": "^9.0.0",
     "@mui/material": "^9.0.0",
     "@mui/material-nextjs": "^9.0.0",
+    "@mui/x-charts": "^9.0.4",
     "@mui/x-chat": "^9.0.0-alpha.3",
     "@mui/x-scheduler": "^9.0.0-alpha.4",
     "@prisma/client": "^7.8.0",
@@ -26,7 +27,7 @@
     "@upstash/search": "^0.1.7",
     "@upstash/vector": "^1.2.3",
     "ai": "^6.0.175",
-    "dotenv": "^17.4.2",
+    "fast-xml-parser": "^5.7.3",
     "next": "^16.2.4",
     "prisma": "^7.8.0",
     "react": "^19.2.5",
@@ -41,6 +42,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/uuid": "^10.0.0",
+    "dotenv": "^17.4.2",
     "typescript": "5.9.3"
   }
 }

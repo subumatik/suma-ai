@@ -7,7 +7,7 @@ export default async function ClientsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('role, referans_kodu').eq('id', user.id).single();
   const role = profile?.role ?? 'client';
 
   let clients: any[] = [];
@@ -32,5 +32,5 @@ export default async function ClientsPage() {
     clients = c ?? [];
   }
 
-  return <ClientsClient clients={clients} role={role} />;
+  return <ClientsClient clients={clients} role={role} referansKodu={profile?.referans_kodu ?? null} />;
 }

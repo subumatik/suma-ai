@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { EventCalendar, eventCalendarClasses } from '@mui/x-scheduler';
@@ -17,6 +17,7 @@ interface AppointmentsClientProps {
   userId: string;
   lawyers: any[];
   clients: any[];
+  hearings: any[];
 }
 
 const statusConfig: Record<string, { label: string; color: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
@@ -33,23 +34,44 @@ const statusColorMap: Record<string, any> = {
   COMPLETED: 'blue',
 };
 
-export default function AppointmentsClient({ appointments, role, userId, lawyers, clients }: AppointmentsClientProps) {
+export default function AppointmentsClient({ appointments, role, userId, lawyers, clients, hearings }: AppointmentsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const initialLawyerId = searchParams.get('lawyer') ?? '';
 
-  const [events, setEvents] = useState(() =>
-    appointments.map((a) => ({
-      id: a.id,
-      title: a.topic || 'Randevu',
-      start: new Date(a.appointment_date).toISOString(),
-      end: new Date(new Date(a.appointment_date).getTime() + (a.duration_minutes || 60) * 60000).toISOString(),
-      color: statusColorMap[a.status] || 'teal',
-      description: a.notes || '',
-    }))
-  );
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    const safeDate = (val: any) => {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    };
+    setEvents([
+      ...appointments.filter((a) => a.appointment_date).map((a) => ({
+        id: a.id,
+        title: a.topic || 'Randevu',
+        start: safeDate(a.appointment_date),
+        end: safeDate(new Date(new Date(a.appointment_date).getTime() + (a.duration_minutes || 60) * 60000)),
+        color: statusColorMap[a.status] || 'teal',
+        description: a.notes || '',
+        type: 'appointment' as const,
+      })),
+      ...hearings.filter((h) => h.hearing_date).map((h) => ({
+        id: `hearing-${h.id}`,
+        title: `Duruşma: ${h.dosya?.title || 'Dosya'}`,
+        start: safeDate(h.hearing_date),
+        end: safeDate(new Date(new Date(h.hearing_date).getTime() + 60 * 60000)),
+        color: 'purple',
+        description: [h.court_name, h.description].filter(Boolean).join(' - '),
+        type: 'hearing' as const,
+        hearing: h,
+      })),
+    ]);
+  }, [appointments, hearings]);
+
   const [visibleDate, setVisibleDate] = useState(new Date());
+  const [view, setView] = useState<'day' | 'week' | 'month' | 'agenda'>('week');
 
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
@@ -70,6 +92,12 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
   }, [role, userId, initialLawyerId]);
 
   const handleEventClick = useCallback((event: any) => {
+    if (event.type === 'hearing') {
+      setSelectedEvent(event.hearing);
+      setSelectedSlot(null);
+      setOpenDialog(true);
+      return;
+    }
     const appt = appointments.find((a) => a.id === event.id);
     if (appt) {
       setSelectedEvent(appt);
@@ -130,10 +158,10 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
       return;
     }
 
-    // Detect event update (drag or resize)
+    // Detect event update (drag or resize) - skip hearings
     const updatedEvent = value.find((v) => {
       const old = events.find((e) => e.id === v.id);
-      return old && (old.start !== v.start || old.end !== v.end);
+      return old && old.type !== 'hearing' && (old.start !== v.start || old.end !== v.end);
     });
     if (updatedEvent) {
       const appt = appointments.find((a) => a.id === updatedEvent.id);
@@ -202,6 +230,7 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
           end: new Date(new Date(appointmentDate).getTime() + newAppt.duration_minutes * 60000).toISOString(),
           color: statusColorMap[role === 'lawyer' ? 'CONFIRMED' : 'REQUESTED'] || 'teal',
           description: newAppt.notes,
+          type: 'appointment' as const,
         },
       ]);
       setNewAppt({ lawyer_id: role === 'lawyer' ? userId : '', client_id: '', topic: '', notes: '', duration_minutes: 60 });
@@ -249,8 +278,10 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
           defaultView="week"
           views={['day', 'week', 'month']}
           dateLocale={tr}
+          view={view}
+          onViewChange={(newView) => setView(newView)}
           visibleDate={visibleDate}
-          onVisibleDateChange={(date) => setVisibleDate(new Date(date.value))}
+          onVisibleDateChange={(date) => setVisibleDate(new Date(date))}
           onClick={handleCalendarClick}
           localeText={{
             today: 'Bugün',
@@ -336,32 +367,56 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
       {/* Dialog for Create / View / Edit */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {selectedEvent ? selectedEvent.topic : (role === 'lawyer' ? 'Yeni Randevu Oluştur' : 'Yeni Randevu Talebi')}
+          {selectedEvent
+            ? (selectedEvent.hearing_date ? 'Duruşma Detayı' : selectedEvent.topic)
+            : (role === 'lawyer' ? 'Yeni Randevu Oluştur' : 'Yeni Randevu Talebi')}
         </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'visible' }}>
           {selectedEvent ? (
-            <>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Chip label={statusConfig[selectedEvent.status]?.label || selectedEvent.status} color={statusConfig[selectedEvent.status]?.color || 'default'} />
-              </Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                <strong>Tarih:</strong> {new Date(selectedEvent.appointment_date).toLocaleString('tr-TR')}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                <strong>Süre:</strong> {selectedEvent.duration_minutes} dakika
-              </Typography>
-              {selectedEvent.notes && (
+            selectedEvent.hearing_date ? (
+              <>
+                <Chip label="Duruşma" color="secondary" />
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  <strong>Notlar:</strong> {selectedEvent.notes}
+                  <strong>Tarih:</strong> {new Date(selectedEvent.hearing_date).toLocaleString('tr-TR')}
                 </Typography>
-              )}
-              {role === 'lawyer' && selectedEvent.status === 'REQUESTED' && (
-                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                  <Button size="small" variant="contained" color="success" onClick={() => handleStatus(selectedEvent.id, 'CONFIRMED')}>Onayla</Button>
-                  <Button size="small" variant="outlined" color="error" onClick={() => handleStatus(selectedEvent.id, 'CANCELLED')}>Reddet</Button>
+                {selectedEvent.court_name && (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    <strong>Mahkeme:</strong> {selectedEvent.court_name}
+                  </Typography>
+                )}
+                {selectedEvent.description && (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    <strong>Açıklama:</strong> {selectedEvent.description}
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <strong>Dosya:</strong> {selectedEvent.dosya?.title || '-'}
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Chip label={statusConfig[selectedEvent.status]?.label || selectedEvent.status} color={statusConfig[selectedEvent.status]?.color || 'default'} />
                 </Box>
-              )}
-            </>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <strong>Tarih:</strong> {new Date(selectedEvent.appointment_date).toLocaleString('tr-TR')}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <strong>Süre:</strong> {selectedEvent.duration_minutes} dakika
+                </Typography>
+                {selectedEvent.notes && (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    <strong>Notlar:</strong> {selectedEvent.notes}
+                  </Typography>
+                )}
+                {role === 'lawyer' && selectedEvent.status === 'REQUESTED' && (
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Button size="small" variant="contained" color="success" onClick={() => handleStatus(selectedEvent.id, 'CONFIRMED')}>Onayla</Button>
+                    <Button size="small" variant="outlined" color="error" onClick={() => handleStatus(selectedEvent.id, 'CANCELLED')}>Reddet</Button>
+                  </Box>
+                )}
+              </>
+            )
           ) : (
             <>
               {role === 'client' && (

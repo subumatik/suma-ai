@@ -34,6 +34,8 @@ model Profile {
   auditLogs          AuditLog[]
   categories         Category[]
   statuses           Status[]
+  lawyerAConnections LawyerConnection[] @relation("LawyerAConnections")
+  lawyerBConnections LawyerConnection[] @relation("LawyerBConnections")
 
   @@map("profiles")
 }
@@ -92,6 +94,7 @@ model Dosya {
   statusUpdates  DosyaStatusUpdate[]
   messages       Message[]
   chunks         DocumentChunk[]
+  hearings       Hearing[]
 
   @@map("dosyalar")
 }
@@ -203,6 +206,34 @@ model Notification {
   user        Profile  @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model Hearing {
+  id                    String   @id @default(uuid()) @db.Uuid
+  dosya_id              String   @db.Uuid
+  hearing_date          DateTime @db.Timestamptz(6)
+  court_name            String?
+  description           String?
+  reminder_days_before  Int?
+  reminder_email_sent   Boolean  @default(false)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  dosya   Dosya   @relation(fields: [dosya_id], references: [id], onDelete: Cascade)
+
+  @@map("hearings")
+}
+
+model LawyerConnection {
+  id          String   @id @default(uuid()) @db.Uuid
+  lawyer_a_id String   @db.Uuid
+  lawyer_b_id String   @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  lawyerA Profile @relation("LawyerAConnections", fields: [lawyer_a_id], references: [id], onDelete: Cascade)
+  lawyerB Profile @relation("LawyerBConnections", fields: [lawyer_b_id], references: [id], onDelete: Cascade)
+
+  @@unique([lawyer_a_id, lawyer_b_id])
+  @@map("lawyer_connections")
 }
 
 model AuditLog {

@@ -5,7 +5,11 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ChatBox } from '@mui/x-chat';
 import type { ChatAdapter, ChatMessage, ChatConversation, ChatUser } from '@mui/x-chat-headless';
-import { Box, Paper } from '@mui/material';
+import {
+  Box, Paper, Button, Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Typography, Snackbar, Alert,
+} from '@mui/material';
+import { PersonAdd } from '@mui/icons-material';
 
 interface MessagesClientProps {
   userId: string;
@@ -58,8 +62,13 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
   const supabase = createClient();
   const initialUserId = searchParams.get('u');
   const [initialConversationId] = useState<string | undefined>(initialUserId ?? undefined);
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(toChatMessages(messages, userId));
+  const localMessages = useMemo(() => toChatMessages(messages, userId), [messages, userId]);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
+
+  const [openDialog, setOpenDialog] = useState(false);
+  const [refCode, setRefCode] = useState('');
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
   const contactMap = useMemo(() => {
     const map = new Map<string, any>();
@@ -80,10 +89,13 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
 
     const convs: ChatConversation[] = allUsers.map((u) => {
       const contactName = u.full_name ?? 'Kullanıcı';
+      const subtitle = u.role === 'lawyer'
+        ? (u.specialization ? `Avukat · ${u.specialization}` : 'Avukat')
+        : 'Müvekkil';
       return {
         id: u.id,
         title: contactName,
-        subtitle: u.role === 'lawyer' ? 'Avukat' : 'Müvekkil',
+        subtitle,
         unreadCount: unreadCount(u.id),
         lastMessageAt: lastMessageAt(u.id),
         participants: [
@@ -105,45 +117,27 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
     setConversations(convs);
   }, [allUsers, messages, userId, userName]);
 
-  // Supabase realtime for messages
-  useEffect(() => {
-    const channel = supabase
-      .channel('messages-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const msg = payload.new as any;
-          if (msg.sender_id === userId || msg.receiver_id === userId) {
-            const senderName = msg.sender_id === userId ? userName : contactMap.get(msg.sender_id)?.full_name ?? 'Kullanıcı';
-            setLocalMessages((prev) => {
-              if (prev.find((p) => p.id === msg.id)) return prev;
-              return [
-                ...prev,
-                {
-                  id: msg.id,
-                  role: msg.sender_id === userId ? ('user' as const) : ('assistant' as const),
-                  parts: [{ type: 'text' as const, text: msg.content }],
-                  createdAt: msg.created_at,
-                  author: {
-                    id: msg.sender_id,
-                    displayName: senderName,
-                    role: msg.sender_id === userId ? ('user' as const) : ('assistant' as const),
-                    avatarUrl: getInitialsAvatar(
-                      senderName,
-                      msg.sender_id === userId ? '#3B82F6' : '#10B981',
-                      '#ffffff'
-                    ),
-                  },
-                },
-              ];
-            });
-          }
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, userId, contactMap, userName]);
+  const handleConnectLawyer = async () => {
+    if (!refCode.trim()) return;
+    setConnectLoading(true);
+    try {
+      const res = await fetch('/api/lawyers/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referansKodu: refCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Bağlantı kurulamadı');
+      setToast({ open: true, message: 'Avukat bağlantısı kuruldu.', severity: 'success' });
+      setOpenDialog(false);
+      setRefCode('');
+      router.refresh();
+    } catch (err: any) {
+      setToast({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setConnectLoading(false);
+    }
+  };
 
   const currentUser: ChatUser = useMemo(
     () => ({
@@ -212,8 +206,20 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
   }, [conversations, localMessages, messages, userId, userName, supabase, contactMap]);
 
   return (
-    <Box sx={{ height: 'calc(100vh - 140px)' }}>
-      <Paper sx={{ height: '100%', borderRadius: 3, overflow: 'hidden' }}>
+    <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+      {role === 'lawyer' && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<PersonAdd />}
+            onClick={() => setOpenDialog(true)}
+          >
+            Avukat Ekle
+          </Button>
+        </Box>
+      )}
+      <Paper sx={{ flex: 1, borderRadius: 3, overflow: 'hidden' }}>
         <ChatBox
           adapter={adapter}
           conversations={conversations}
@@ -245,6 +251,44 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
           sx={{ height: '100%' }}
         />
       </Paper>
+
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Avukat Ekle</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Mesajlaşmak istediğiniz avukatın referans kodunu girin.
+          </Typography>
+          <TextField
+            label="Referans Kodu"
+            fullWidth
+            value={refCode}
+            onChange={(e) => setRefCode(e.target.value)}
+            placeholder="Örn: ABC123"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleConnectLawyer(); }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>İptal</Button>
+          <Button
+            variant="contained"
+            onClick={handleConnectLawyer}
+            disabled={connectLoading || !refCode.trim()}
+          >
+            {connectLoading ? 'Ekleniyor...' : 'Ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

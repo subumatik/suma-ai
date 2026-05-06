@@ -179,7 +179,8 @@ export default function ChatInterface({ caseId, userId, userName }: ChatInterfac
           <SmartToy fontSize="small" /> Yapay Zeka Dava Asistanı
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.8 }}>
-          Yüklenen belgelere (PDF/DOCX) göre sorularınızı cevaplar.
+          Yüklenen belgelere göre sorularınızı cevaplar. Yargıtay araması için{" "}
+          <strong>@yargitay_sorgula</strong> yazın.
         </Typography>
       </Box>
 
