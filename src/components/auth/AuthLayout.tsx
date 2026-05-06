@@ -62,7 +62,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </Box>
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Avukatip Platformu
+                Hukuki süreçleriniz artık bir tık uzağınızda
               </Typography>
             </Box>
 
@@ -70,7 +70,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
 
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                KVKK ve GDPR uyumlu · Güvenli iletişim
+                KVKK uyumlu · Uçtan uca şifreli · Güvenli iletişim
               </Typography>
             </Box>
           </CardContent>

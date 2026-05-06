@@ -35,7 +35,7 @@ export const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: '"Montserrat","Inter","Roboto","Helvetica","Arial",sans-serif',
+    fontFamily: 'var(--font-montserrat),"Inter","Roboto","Helvetica","Arial",sans-serif',
     h1: { fontWeight: 700, letterSpacing: '-0.02em' },
     h2: { fontWeight: 700, letterSpacing: '-0.02em' },
     h3: { fontWeight: 600, letterSpacing: '-0.01em' },

@@ -39,6 +39,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
   });
 
   const handleCreate = async () => {
+    if (role === 'client') return;
     if (!newDosya.title || !newDosya.client_id || !newDosya.status_id) return;
     setLoading(true);
     await supabase.from('dosyalar').insert({
@@ -52,6 +53,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
   };
 
   const handleUpdate = async () => {
+    if (role === 'client') return;
     if (!editDosya.title || !editDosya.client_id || !editDosya.status_id) return;
     setLoading(true);
     await supabase.from('dosyalar').update({
@@ -71,6 +73,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (role === 'client') return;
     if (!confirm('Bu dosyayı silmek istediğinize emin misiniz? İlgili tüm belgeler de silinecektir.')) return;
     await supabase.from('dosyalar').delete().eq('id', id);
     router.refresh();

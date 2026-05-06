@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ChatBox } from '@mui/x-chat';
@@ -75,6 +75,16 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
     allUsers.forEach((u) => map.set(u.id, u));
     return map;
   }, [allUsers]);
+
+  // Refs to keep adapter stable across re-renders
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
+  const localMessagesRef = useRef(localMessages);
+  localMessagesRef.current = localMessages;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const contactMapRef = useRef(contactMap);
+  contactMapRef.current = contactMap;
 
   // Build conversations from allUsers with unread counts
   useEffect(() => {
@@ -152,12 +162,12 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
   const adapter: ChatAdapter = useMemo(() => {
     return {
       listConversations: async () => ({
-        conversations,
+        conversations: conversationsRef.current,
         hasMore: false,
       }),
       listMessages: async ({ conversationId }) => ({
-        messages: localMessages.filter((m) => {
-          const raw = messages.find((rawM) => rawM.id === m.id);
+        messages: localMessagesRef.current.filter((m) => {
+          const raw = messagesRef.current.find((rawM: any) => rawM.id === m.id);
           if (!raw) return false;
           return (raw.sender_id === userId && raw.receiver_id === conversationId) || (raw.sender_id === conversationId && raw.receiver_id === userId);
         }).sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()),
@@ -165,23 +175,28 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
       }),
       sendMessage: async ({ message, conversationId }) => {
         await supabase.from('messages').insert({
+          id: message.id,
           sender_id: userId,
           receiver_id: conversationId,
           content: message.parts.map((p: any) => (p.type === 'text' ? p.text : '')).join(''),
+          created_at: message.createdAt ?? new Date().toISOString(),
         });
         return new ReadableStream({ start(c) { c.close(); } });
       },
       subscribe: async ({ onEvent }) => {
+        const channelName = `messages-sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const channel = supabase
-          .channel('messages-sub')
+          .channel(channelName)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
             const msg = payload.new as any;
             if (msg.sender_id === userId || msg.receiver_id === userId) {
-              const senderName = msg.sender_id === userId ? userName : contactMap.get(msg.sender_id)?.full_name ?? 'Kullanıcı';
+              const senderName = msg.sender_id === userId ? userName : contactMapRef.current.get(msg.sender_id)?.full_name ?? 'Kullanıcı';
+              const otherId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
               onEvent({
                 type: 'message-added',
                 message: {
                   id: msg.id,
+                  conversationId: otherId,
                   role: msg.sender_id === userId ? 'user' : 'assistant',
                   parts: [{ type: 'text', text: msg.content }],
                   createdAt: msg.created_at,
@@ -199,11 +214,42 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
               } as any);
             }
           })
-          .subscribe();
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+            const msg = payload.new as any;
+            if (msg.sender_id === userId || msg.receiver_id === userId) {
+              const senderName = msg.sender_id === userId ? userName : contactMapRef.current.get(msg.sender_id)?.full_name ?? 'Kullanıcı';
+              const otherId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
+              onEvent({
+                type: 'message-updated',
+                message: {
+                  id: msg.id,
+                  conversationId: otherId,
+                  role: msg.sender_id === userId ? 'user' : 'assistant',
+                  parts: [{ type: 'text', text: msg.content }],
+                  createdAt: msg.created_at,
+                  author: {
+                    id: msg.sender_id,
+                    displayName: senderName,
+                    role: msg.sender_id === userId ? 'user' : 'assistant',
+                    avatarUrl: getInitialsAvatar(
+                      senderName,
+                      msg.sender_id === userId ? '#3B82F6' : '#10B981',
+                      '#ffffff'
+                    ),
+                  },
+                },
+              } as any);
+            }
+          })
+          .subscribe((status) => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Realtime] channel status:', status);
+            }
+          });
         return () => { supabase.removeChannel(channel); };
       },
     };
-  }, [conversations, localMessages, messages, userId, userName, supabase, contactMap]);
+  }, [userId, userName, supabase]);
 
   return (
     <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>

@@ -14,9 +14,9 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Avukatip - Avukatip Platformu",
+  title: "Avukatip — Hukuki İşlemlerin Akıllı Yol Arkadaşı",
   description:
-    "Avukatip ile avukatınızdan randevu alın, dava dosyalarınızı takip edin ve avukatınızla güvenli mesajlaşın.",
+    "Randevu, dava takibi, belge yönetimi ve güvenli mesajlaşma — hepsi tek platformda.",
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={montserrat.variable} style={{ fontFamily: 'var(--font-montserrat), sans-serif' }}>
+      <body className={montserrat.variable}>
         <InitColorSchemeScript attribute="class" defaultMode="light" />
         <AppRouterCacheProvider>
           <Providers>

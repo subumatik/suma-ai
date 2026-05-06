@@ -12,7 +12,13 @@ export default async function LawyersPage() {
 
   let lawyers: any[] = [];
 
-  if (role === 'client') {
+  if (role === 'lawyer' || role === 'admin') {
+    const { data: l } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, phone, specialization, baro_number, referans_kodu')
+      .eq('role', 'lawyer');
+    lawyers = l ?? [];
+  } else {
     const { data: caseLawyers } = await supabase
       .from('dosyalar')
       .select('lawyer_id')
@@ -27,13 +33,7 @@ export default async function LawyersPage() {
         .eq('role', 'lawyer');
       lawyers = l ?? [];
     }
-  } else {
-    const { data: l } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, phone, specialization, baro_number, referans_kodu')
-      .eq('role', 'lawyer');
-    lawyers = l ?? [];
   }
 
-  return <LawyersClient lawyers={lawyers} userId={user.id} />;
+  return <LawyersClient lawyers={lawyers} userId={user.id} role={role} />;
 }

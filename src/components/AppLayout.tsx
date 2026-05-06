@@ -125,9 +125,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Toolbar sx={{ px: 2.5, minHeight: 72, gap: 1.5 }}>
         <Balance sx={{ color: 'primary.main', fontSize: 28 }} />
         {!collapsed && (
-          <Typography variant="h6" sx={{ letterSpacing: '-0.02em', fontFamily: '"Montserrat",sans-serif' }}>
-            <Box component="span" sx={{ fontWeight: 700 }}>Avu</Box>
-            <Box component="span" sx={{ fontWeight: 400 }}>katip</Box>
+          <Typography variant="h6" sx={{ letterSpacing: '-0.02em' }}>
+            <Box component="span" sx={{ fontWeight: 400 }}>Avu</Box>
+            <Box component="span" sx={{ fontWeight: 700 }}>katip</Box>
           </Typography>
         )}
       </Toolbar>
@@ -199,7 +199,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </IconButton>
             )}
             <Typography variant="subtitle1" sx={{ color: 'text.secondary', flexGrow: 1 }}>
-              {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'Avukatip'}
+              {navItems.find((n) => pathname === n.path || pathname.startsWith(n.path + '/'))?.label || 'Hukuki İşlemlerin Akıllı Yol Arkadaşı'}
             </Typography>
             <ThemeToggle />
             <IconButton onClick={(e) => setNotifAnchorEl(e.currentTarget)} sx={{ color: 'text.secondary' }}>

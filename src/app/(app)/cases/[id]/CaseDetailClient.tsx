@@ -78,6 +78,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   };
 
   const handleRenameDocument = async () => {
+    if (role === 'client') return;
     if (!newDocName.trim() || !docToRename) return;
     await supabase.from('dosya_documents').update({ file_name: newDocName }).eq('id', docToRename.id);
     setDocToRename(null);
@@ -86,6 +87,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   };
 
   const handleDeleteDocument = async (docId: string, filePath: string) => {
+    if (role === 'client') return;
     if (!confirm('Bu dosyayı silmek istediğinize emin misiniz?')) return;
     if (filePath) await supabase.storage.from('case-documents').remove([filePath]);
     await supabase.from('dosya_documents').delete().eq('id', docId);
@@ -105,6 +107,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   };
 
   const handleStatusUpdate = async () => {
+    if (role === 'client') return;
     await supabase.from('dosya_status_updates').insert({
       dosya_id: dosya.id,
       status_id: newStatusId,
@@ -121,6 +124,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
 
   // Hearing handlers
   const handleCreateHearing = async () => {
+    if (role === 'client') return;
     if (!newHearing.hearing_date) {
       showToast('Duruşma tarihi zorunludur.', 'error');
       return;
@@ -152,6 +156,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   };
 
   const handleDeleteHearing = async (id: string) => {
+    if (role === 'client') return;
     if (!confirm('Bu duruşmayı silmek istediğinize emin misiniz?')) return;
     try {
       const res = await fetch(`/api/hearings/delete?id=${id}`, { method: 'DELETE' });
@@ -164,6 +169,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   };
 
   const handleSendReminder = async (hearingId: string) => {
+    if (role === 'client') return;
     try {
       const res = await fetch('/api/hearings/reminder', {
         method: 'POST',

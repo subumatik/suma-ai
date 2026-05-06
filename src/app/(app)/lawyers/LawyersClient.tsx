@@ -4,18 +4,24 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box, Card, CardContent, Typography, Button, TextField, Grid,
-  Avatar, Chip, InputAdornment,
+  Avatar, Chip, InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions,
+  Snackbar, Alert,
 } from '@mui/material';
-import { Person, Search, CalendarMonth, Mail, Phone, Balance } from '@mui/icons-material';
+import { Person, Search, CalendarMonth, Mail, Phone, Add } from '@mui/icons-material';
 
 interface LawyersClientProps {
   lawyers: any[];
   userId: string;
+  role: string;
 }
 
-export default function LawyersClient({ lawyers, userId }: LawyersClientProps) {
+export default function LawyersClient({ lawyers, userId, role }: LawyersClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [openDialog, setOpenDialog] = useState(false);
+  const [refCode, setRefCode] = useState('');
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
   const filtered = lawyers.filter((l) => {
     const q = search.toLowerCase();
@@ -26,9 +32,38 @@ export default function LawyersClient({ lawyers, userId }: LawyersClientProps) {
     );
   });
 
+  const handleConnect = async () => {
+    if (!refCode.trim()) return;
+    setConnectLoading(true);
+    try {
+      const res = await fetch('/api/clients/connect-lawyer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: refCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Bağlantı kurulamadı');
+      setToast({ open: true, message: `${data.lawyer?.full_name || 'Avukat'} başarıyla eklendi.`, severity: 'success' });
+      setOpenDialog(false);
+      setRefCode('');
+      router.refresh();
+    } catch (err: any) {
+      setToast({ open: true, message: err.message, severity: 'error' });
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>Avukatlar</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Avukatlar</Typography>
+        {role === 'client' && (
+          <Button variant="contained" startIcon={<Add />} onClick={() => setOpenDialog(true)}>
+            Avukat Ekle
+          </Button>
+        )}
+      </Box>
 
       <TextField
         placeholder="Avukat ara..."
@@ -66,7 +101,6 @@ export default function LawyersClient({ lawyers, userId }: LawyersClientProps) {
 
                 {l.baro_number && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Balance sx={{ fontSize: 16, color: 'text.secondary' }} />
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>Baro No: {l.baro_number}</Typography>
                   </Box>
                 )}
@@ -103,6 +137,34 @@ export default function LawyersClient({ lawyers, userId }: LawyersClientProps) {
           <Typography variant="h6" sx={{ color: 'text.secondary' }}>Avukat bulunamadı</Typography>
         </Box>
       )}
+
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Avukat Ekle</DialogTitle>
+        <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            Avukatınızın referans kodunu girerek bağlantı kurabilirsiniz.
+          </Typography>
+          <TextField
+            label="Referans Kodu"
+            fullWidth
+            value={refCode}
+            onChange={(e) => setRefCode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleConnect(); }}
+            placeholder="Örn: ABC123"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>İptal</Button>
+          <Button variant="contained" onClick={handleConnect} disabled={connectLoading || !refCode.trim()}>
+            {connectLoading ? 'Ekleniyor...' : 'Ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.message}</Alert>
+      </Snackbar>
     </Box>
   );
 }

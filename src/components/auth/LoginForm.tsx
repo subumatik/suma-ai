@@ -28,7 +28,8 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = async () => {
+  const handleLogin = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setError('');
     if (!email || !password) {
       setError('E-posta ve şifre gereklidir');
@@ -55,7 +56,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const shrinkProps = { inputLabel: { shrink: true } };
 
   return (
-    <>
+    <form onSubmit={handleLogin}>
       <Fade in={!!error}>
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -99,9 +100,9 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
       <Button
         fullWidth
+        type="submit"
         variant="contained"
         size="large"
-        onClick={handleLogin}
         disabled={loading}
         sx={[
           {
@@ -129,6 +130,6 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
           Hesabınız yok mu? Kayıt olun
         </Button>
       </Box>
-    </>
+    </form>
   );
 }
