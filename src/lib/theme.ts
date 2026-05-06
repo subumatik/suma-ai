@@ -46,7 +46,7 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 12 },
   components: {
-    MuiCard: { styleOverrides: { root: { borderRadius: 16, border: '1px solid var(--mui-palette-divider)', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' } } } },
+    MuiCard: { styleOverrides: { root: { borderRadius: 16, border: '1px solid var(--mui-palette-divider)', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', transition: 'box-shadow 0.2s', '&:hover': { boxShadow: '0 8px 32px rgba(0,0,0,0.15)' } } } },
     MuiButton: { styleOverrides: { root: { borderRadius: 10, textTransform: 'none', fontWeight: 600 } } },
     MuiTextField: { styleOverrides: { root: { '& .MuiOutlinedInput-root': { borderRadius: 10, backgroundColor: 'rgba(128,128,128,0.04)' } } } },
     MuiChip: { styleOverrides: { root: { borderRadius: 8, fontWeight: 500 } } },

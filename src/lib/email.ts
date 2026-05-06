@@ -65,6 +65,41 @@ function wrapEmailBody(title: string, bodyContent: string, isOtp = false, otpCod
 </html>`;
 }
 
+export async function sendEmail(to: string, subject: string, title: string, bodyContent: string) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not set');
+    return;
+  }
+
+  const html = wrapEmailBody(title, bodyContent);
+
+  const { data, error } = await resend.emails.send({
+    from: SENDER_EMAIL,
+    to,
+    subject,
+    html,
+  });
+
+  if (error) {
+    console.error('Resend error:', error);
+    throw new Error(error.message);
+  }
+
+  console.log(`Email sent to ${to}, id: ${data?.id}`);
+}
+
+export async function sendAppointmentEmail(
+  to: string,
+  subject: string,
+  title: string,
+  bodyLines: string[]
+) {
+  const bodyContent = bodyLines
+    .map((line) => `<p style="margin: 0 0 12px 0;">${line}</p>`)
+    .join('');
+  return sendEmail(to, subject, title, bodyContent);
+}
+
 export async function sendVerificationOTP(email: string, otp: string, referenceCode?: string | null) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set');

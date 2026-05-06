@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
-import mammoth from 'mammoth';
-import { chunkText } from '@/lib/chunking';
-import { upsertDocumentChunks, DocumentChunk } from '@/lib/vector';
+import Anthropic, { toFile } from '@anthropic-ai/sdk';
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: Request) {
   try {
@@ -27,17 +27,17 @@ export async function POST(req: Request) {
     // Upload file to Supabase Storage
     const fileExt = file.name.split('.').pop();
     const fileName = `${caseId}/${uuidv4()}.${fileExt}`;
-    
+
     const { error: storageError, data: storageData } = await supabase.storage
       .from('case-documents')
       .upload(fileName, buffer, { contentType: file.type });
-      
+
     if (storageError) {
       console.error("Storage upload failed:", storageError);
       return NextResponse.json({ error: `Storage upload failed: ${storageError.message}` }, { status: 500 });
     }
 
-    // Insert record into dosya_documents table so it shows in the UI
+    // Insert record into dosya_documents table
     const { data: docData, error: dbError } = await supabase.from('dosya_documents').insert({
       dosya_id: caseId,
       file_name: file.name,
@@ -52,49 +52,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Database insert failed: ${dbError.message}` }, { status: 500 });
     }
 
-    let aiWarning = null;
+    // Upload to Claude Files API
+    let claudeFileId: string | null = null;
+    let aiWarning: string | null = null;
 
-    // Automatic Vectorization (AI Indexing)
     try {
-      let extractedText = '';
-      const lowerName = file.name.toLowerCase();
+      const uploaded = await client.beta.files.upload({
+        file: await toFile(buffer, file.name, { type: file.type }),
+        betas: ["files-api-2025-04-14"],
+      });
+      claudeFileId = uploaded.id;
 
-      if (lowerName.endsWith('.pdf')) {
-        const pdfParse = require('pdf-parse');
-        const data = await pdfParse(buffer);
-        extractedText = data.text;
-      } else if (lowerName.endsWith('.docx')) {
-        const result = await mammoth.extractRawText({ buffer });
-        extractedText = result.value;
-      } else {
-        throw new Error('Unsupported file type for AI indexing.');
-      }
-
-      if (extractedText && extractedText.trim()) {
-        const chunks = chunkText(extractedText, 250);
-        const vectorChunks: DocumentChunk[] = chunks.map((chunkText, index) => ({
-          id: `${caseId}-${uuidv4()}-${index}`,
-          data: chunkText,
-          metadata: {
-            case_id: caseId,
-            file_name: file.name,
-            chunk_index: index,
-          }
-        }));
-        await upsertDocumentChunks(vectorChunks);
-      } else {
-        throw new Error('Could not extract any text from the document.');
-      }
-    } catch (aiError: any) {
-      console.error("AI Vectorization failed:", aiError);
-      aiWarning = aiError.message || "Yapay zeka indekslemesi başarısız oldu.";
+      // Update dosya_documents with claude_file_id
+      await supabase
+        .from('dosya_documents')
+        .update({ claude_file_id: uploaded.id })
+        .eq('id', docData.id);
+    } catch (claudeError: any) {
+      console.error("Claude Files API upload failed:", claudeError);
+      aiWarning = claudeError.message || "Claude dosya aktarımı başarısız oldu.";
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: aiWarning ? `Belge yüklendi ancak yapay zeka aktarımı yapılamadı: ${aiWarning}` : 'Belge başarıyla yüklendi ve yapay zeka hafızasına eklendi.',
-      document: docData,
-      aiWarning
+    return NextResponse.json({
+      success: true,
+      message: aiWarning
+        ? `Belge yüklendi ancak Claude aktarımı yapılamadı: ${aiWarning}`
+        : 'Belge başarıyla yüklendi ve Claude hafızasına eklendi.',
+      document: { ...docData, claude_file_id: claudeFileId },
+      aiWarning,
     });
 
   } catch (error: any) {

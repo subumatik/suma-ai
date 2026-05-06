@@ -190,8 +190,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <Box sx={{ flexGrow: 1, ml: 0 }}>
-        <AppBar position="sticky" elevation={0}
-          sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', width: { md: `calc(100% - ${drawerWidth}px)` }, ml: { md: `${drawerWidth}px` }, transition: 'width 0.3s, margin-left 0.3s' }}>
+        <AppBar position="fixed" elevation={0}
+          sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', width: { md: `calc(100% - ${drawerWidth}px)` }, ml: { md: `${drawerWidth}px` }, transition: 'width 0.3s, margin-left 0.3s' }}>
           <Toolbar sx={{ minHeight: 64, px: { xs: 2, md: 3 } }}>
             {isMobile && (
               <IconButton onClick={() => setMobileOpen(true)} sx={{ mr: 2, color: 'text.primary' }}>
@@ -283,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ p: { xs: 2, md: 4 }, minHeight: 'calc(100vh - 64px)' }}>
+        <Box component="main" sx={{ p: { xs: 2, md: 4 }, pt: { xs: '80px', md: '96px' }, minHeight: '100vh' }}>
           {children}
         </Box>
       </Box>

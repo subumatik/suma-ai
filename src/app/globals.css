@@ -10,14 +10,13 @@
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
   min-height: 100vh;
 }
 
-/* Smooth transitions for theme changes */
-body,
-body * {
-  transition: background-color 0.2s ease, color 0.15s ease, border-color 0.2s ease;
+/* Smooth transitions for theme changes - scoped to avoid modal/backdrop issues */
+html[data-mui-color-scheme="dark"],
+html[data-mui-color-scheme="light"] {
+  transition: background-color 0.3s ease;
 }
 
 /* Custom scrollbar styling */

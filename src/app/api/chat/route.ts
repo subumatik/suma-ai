@@ -1,14 +1,10 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { streamText } from 'ai';
-import { queryDocumentContext } from '@/lib/vector';
-import { createClient } from '@/lib/supabase/server';
+import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 30;
 
-// Initialize anthropic with case-insensitive API key fallback
-const apiKey = (process.env.ANTHROPIC_API_KEY || process.env.anthropic_api_key || '').trim();
-const anthropic = createAnthropic({
-  apiKey,
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || "",
 });
 
 export async function POST(req: Request) {
@@ -17,56 +13,104 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return new Response('Unauthorized', { status: 401 });
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const { messages, case_id } = await req.json();
 
     if (!case_id) {
-      return new Response('case_id is required', { status: 400 });
+      return new Response("case_id is required", { status: 400 });
     }
 
-    // 1. Normalize messages from frontend to standard CoreMessage format
-    const coreMessages = messages.map((m: any) => ({
-      role: m.role,
-      content: m.content !== undefined ? m.content : (m.parts ? m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('') : '')
+    // Normalize messages to Anthropic format
+    const apiMessages = messages
+      .map((m: any) => ({
+        role: m.role,
+        content:
+          m.content !== undefined
+            ? m.content
+            : m.parts
+              ? m.parts.map((p: any) => (p.type === "text" ? p.text : "")).join("")
+              : "",
+      }))
+      .filter((m: any) => m.role === "user" || m.role === "assistant");
+
+    // Fetch documents with claude_file_id for this case
+    const { data: docs, error: docsError } = await supabase
+      .from('dosya_documents')
+      .select('file_name, claude_file_id')
+      .eq('dosya_id', case_id)
+      .not('claude_file_id', 'is', null);
+
+    if (docsError) {
+      console.error("Docs fetch error:", docsError);
+    }
+
+    // Build document blocks for Claude
+    // @ts-ignore — beta file source not yet in SDK types
+    const documentBlocks = (docs || []).map((doc: any) => ({
+      type: "document",
+      source: { type: "file", file_id: doc.claude_file_id },
+      title: doc.file_name,
+      citations: { enabled: true },
     }));
 
-    // 2. Get the latest user query
-    const latestMessage = coreMessages[coreMessages.length - 1];
-    const userQuery = latestMessage.content;
-
-    // 2. Query Upstash Vector for relevant context
-    let contextTexts = '';
-    try {
-      const results = await queryDocumentContext(case_id, userQuery, 5);
-      contextTexts = results.map(r => r.data).join('\n\n');
-    } catch (err: any) {
-      console.error('Vector search error:', err.message);
+    // Add documents to the latest user message
+    const latestUserMessage = apiMessages[apiMessages.length - 1];
+    if (latestUserMessage && latestUserMessage.role === "user") {
+      latestUserMessage.content = [
+        ...(documentBlocks.length > 0 ? documentBlocks : []),
+        { type: "text", text: latestUserMessage.content },
+      ];
     }
 
-    // 3. Prepare the system prompt
     const systemPrompt = `Sen profesyonel bir yapay zeka avukat asistanısın.
-Kullanıcının davasına (case) ait yüklenmiş olan belgelerden çıkarılan bağlam (context) aşağıdadır:
-
-<context>
-${contextTexts || 'Bu dosya için aranabilir bir belge metni bulunamadı.'}
-</context>
-
-Kullanıcının sorusunu YALNIZCA yukarıdaki bağlamı kullanarak cevapla. Eğer bağlamda sorunun cevabı yoksa, "Bu bilgiyi yüklenen dosyalarda bulamadım" şeklinde cevap ver. Asla bağlam dışı bilgi uydurma (halüsinasyon görme).
+Kullanıcının davasına ait yüklenmiş belgeleri okuyarak sorularını cevapla.
+Eğer belgelerde sorunun cevabı yoksa, "Bu bilgiyi yüklenen dosyalarda bulamadım" şeklinde cevap ver. Asla belge dışı bilgi uydurma.
 Profesyonel, net ve Türkçe yanıt ver.`;
 
-    // 4. Stream response from Anthropic Claude
-    const result = streamText({
-      model: anthropic('claude-sonnet-4-6'),
+    const stream = client.beta.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 64000,
       system: systemPrompt,
-      messages: coreMessages,
+      messages: apiMessages,
+      betas: ["files-api-2025-04-14"],
     });
 
-    return result.toTextStreamResponse();
+    // Convert SDK stream to SSE Response
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              const sse = `data: ${JSON.stringify({ text: event.delta.text })}\n\n`;
+              controller.enqueue(encoder.encode(sse));
+            }
 
+          }
+        } catch (streamError: any) {
+          console.error("Stream error:", streamError);
+          const sse = `data: ${JSON.stringify({ error: streamError.message })}\n\n`;
+          controller.enqueue(encoder.encode(sse));
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error: any) {
-    console.error('Chat API Error:', error);
-    return new Response(error.message || 'Internal Server Error', { status: 500 });
+    console.error("Chat API Error:", error);
+    return new Response(error.message || "Internal Server Error", { status: 500 });
   }
 }

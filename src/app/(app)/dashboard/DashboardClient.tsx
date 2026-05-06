@@ -68,9 +68,9 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {stats.map((s) => (
-          <Grid size={{ xs: 12, sm: 6, md: isAdmin ? 4 : 3 }} key={s.label}>
+          <Grid size={{ xs: 12, sm: 6, md: 6, lg: isAdmin ? 4 : 3 }} key={s.label}>
             <Card>
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: `${s.color}20`, color: s.color, width: 48, height: 48 }}>{s.icon}</Avatar>
                   <Box>

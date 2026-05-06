@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -24,9 +24,10 @@ interface Props {
   categories: any[];
   role: string;
   userId: string;
+  userName: string;
 }
 
-export default function CaseDetailClient({ dosya, documents, statusUpdates, messages, statuses, categories, role, userId }: Props) {
+export default function CaseDetailClient({ dosya, documents, statusUpdates, messages: initialMessages, statuses, categories, role, userId, userName }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [tab, setTab] = useState(0);
@@ -37,9 +38,28 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
   const [openStatusDialog, setOpenStatusDialog] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [messages, setMessages] = useState(initialMessages);
   
   const [docToRename, setDocToRename] = useState<any>(null);
   const [newDocName, setNewDocName] = useState('');
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('case-messages-' + dosya.id)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `dosya_id=eq.${dosya.id}` },
+        (payload) => {
+          const msg = payload.new as any;
+          setMessages((prev) => {
+            if (prev.find((p) => p.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase, dosya.id]);
 
   const handleRenameDocument = async () => {
     if (!newDocName.trim() || !docToRename) return;
@@ -66,7 +86,6 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       content: newMessage.trim(),
     });
     setNewMessage('');
-    router.refresh();
   };
 
   const handleStatusUpdate = async () => {
@@ -249,7 +268,7 @@ export default function CaseDetailClient({ dosya, documents, statusUpdates, mess
       )}
 
       {tab === 3 && (
-        <ChatInterface caseId={dosya.id} />
+        <ChatInterface caseId={dosya.id} userId={userId} userName={userName} />
       )}
 
       <Dialog open={openStatusDialog} onClose={() => setOpenStatusDialog(false)} maxWidth="sm" fullWidth>

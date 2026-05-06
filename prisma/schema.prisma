@@ -91,25 +91,44 @@ model Dosya {
   documents      DosyaDocument[]
   statusUpdates  DosyaStatusUpdate[]
   messages       Message[]
+  chunks         DocumentChunk[]
 
   @@map("dosyalar")
 }
 
 model DosyaDocument {
-  id          String   @id @default(uuid()) @db.Uuid
-  dosya_id    String   @db.Uuid
-  file_name   String
-  file_url    String
-  file_type   String?
-  file_size   Int?
-  uploaded_by String   @db.Uuid
-  description String?
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  id             String           @id @default(uuid()) @db.Uuid
+  dosya_id       String           @db.Uuid
+  file_name      String
+  file_url       String
+  file_type      String?
+  file_size      Int?
+  uploaded_by    String           @db.Uuid
+  description    String?
+  claude_file_id String?
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
 
-  dosya       Dosya    @relation(fields: [dosya_id], references: [id], onDelete: Cascade)
-  uploader    Profile  @relation(fields: [uploaded_by], references: [id], onDelete: Cascade)
+  dosya       Dosya            @relation(fields: [dosya_id], references: [id], onDelete: Cascade)
+  uploader    Profile          @relation(fields: [uploaded_by], references: [id], onDelete: Cascade)
+  chunks      DocumentChunk[]
 
   @@map("dosya_documents")
+}
+
+model DocumentChunk {
+  id                String   @id @default(uuid()) @db.Uuid
+  dosya_document_id String   @db.Uuid
+  case_id           String   @db.Uuid
+  content           String
+  embedding         Unsupported("vector(384)")?
+  metadata          Json?    @db.JsonB
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  document DosyaDocument @relation(fields: [dosya_document_id], references: [id], onDelete: Cascade)
+  dosya    Dosya         @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@index([case_id])
+  @@map("document_chunks")
 }
 
 model DosyaStatusUpdate {

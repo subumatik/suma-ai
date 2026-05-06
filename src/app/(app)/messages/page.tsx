@@ -7,32 +7,42 @@ export default async function MessagesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single();
   const role = profile?.role ?? 'client';
+  const userName = profile?.full_name ?? 'Kullanıcı';
 
-  const [{ data: sent }, { data: received }, { data: messages }, { data: allUsers }] = await Promise.all([
-    supabase.from('messages').select('receiver_id').eq('sender_id', user.id),
-    supabase.from('messages').select('sender_id').eq('receiver_id', user.id),
+  // Fetch connected users through dosyalar (cases)
+  let connectedUserIds: string[] = [];
+  if (role === 'client') {
+    const { data: dosyalar } = await supabase.from('dosyalar').select('lawyer_id').eq('client_id', user.id);
+    connectedUserIds = [...new Set((dosyalar ?? []).map((d) => d.lawyer_id).filter(Boolean))];
+  } else {
+    const { data: dosyalar } = await supabase.from('dosyalar').select('client_id').eq('lawyer_id', user.id);
+    connectedUserIds = [...new Set((dosyalar ?? []).map((d) => d.client_id).filter(Boolean))];
+  }
+
+  const [{ data: messages }, { data: connectedUsers }] = await Promise.all([
     supabase.from('messages').select('*, sender:sender_id(full_name), receiver:receiver_id(full_name)').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(200),
-    supabase.from('profiles').select('id, full_name, role, specialization, baro_number').neq('role', 'admin'),
+    connectedUserIds.length > 0
+      ? supabase.from('profiles').select('id, full_name, role, specialization, baro_number').in('id', connectedUserIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
+  // Contacts = people we have messages with
   const contactIds = Array.from(new Set([
-    ...(sent?.map((s) => s.receiver_id) ?? []),
-    ...(received?.map((r) => r.sender_id) ?? []),
+    ...(messages?.filter((m) => m.sender_id === user.id).map((m) => m.receiver_id) ?? []),
+    ...(messages?.filter((m) => m.receiver_id === user.id).map((m) => m.sender_id) ?? []),
   ]));
 
-  const contacts = allUsers?.filter((u) => contactIds.includes(u.id)) ?? [];
-  const relevantUsers = role === 'lawyer'
-    ? allUsers?.filter((u) => u.role === 'client') ?? []
-    : allUsers?.filter((u) => u.role === 'lawyer') ?? [];
+  const contacts = (connectedUsers ?? []).filter((u) => contactIds.includes(u.id));
 
   return (
     <MessagesClient
       userId={user.id}
+      userName={userName}
       role={role}
       contacts={contacts}
-      allUsers={relevantUsers}
+      allUsers={connectedUsers ?? []}
       messages={messages ?? []}
     />
   );

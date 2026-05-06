@@ -8,8 +8,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single();
   const role = profile?.role ?? 'client';
+  const userName = profile?.full_name ?? 'Kullanıcı';
 
   const { data: dosya } = await supabase
     .from('dosyalar')
@@ -37,6 +38,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       categories={categories ?? []}
       role={role}
       userId={user.id}
+      userName={userName}
     />
   );
 }

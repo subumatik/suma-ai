@@ -19,5 +19,24 @@ export default async function AppointmentsPage() {
     role === 'client' ? supabase.from('profiles').select('id, full_name, specialization').eq('role', 'lawyer') : Promise.resolve({ data: [] }),
   ]);
 
-  return <AppointmentsClient appointments={appointments ?? []} role={role} userId={user.id} lawyers={lawyers ?? []} />;
+  // Fetch unique clients for lawyer
+  let clients: any[] = [];
+  if (role === 'lawyer') {
+    const { data: dosyalar } = await supabase.from('dosyalar').select('client_id').eq('lawyer_id', user.id);
+    const clientIds = [...new Set((dosyalar ?? []).map((d) => d.client_id).filter(Boolean))];
+    if (clientIds.length > 0) {
+      const { data: clientProfiles } = await supabase.from('profiles').select('id, full_name').in('id', clientIds);
+      clients = clientProfiles ?? [];
+    }
+  }
+
+  return (
+    <AppointmentsClient
+      appointments={appointments ?? []}
+      role={role}
+      userId={user.id}
+      lawyers={lawyers ?? []}
+      clients={clients}
+    />
+  );
 }

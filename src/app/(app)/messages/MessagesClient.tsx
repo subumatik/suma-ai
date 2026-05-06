@@ -1,208 +1,250 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import {
-  Box, Card, CardContent, Typography, TextField, Button, Avatar,
-  List, ListItem, ListItemAvatar, ListItemText, Divider, Paper, IconButton,
-  Badge,
-} from '@mui/material';
-import { Send, Person, Chat } from '@mui/icons-material';
+import { ChatBox } from '@mui/x-chat';
+import type { ChatAdapter, ChatMessage, ChatConversation, ChatUser } from '@mui/x-chat-headless';
+import { Box, Paper } from '@mui/material';
 
 interface MessagesClientProps {
   userId: string;
+  userName: string;
   role: string;
   contacts: any[];
   allUsers: any[];
   messages: any[];
 }
 
-export default function MessagesClient({ userId, role, contacts, allUsers, messages }: MessagesClientProps) {
-  const router = useRouter();
+function getInitialsAvatar(name: string, bg: string, fg: string): string {
+  const initials = name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="${bg}" rx="32"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="${fg}" font-size="28" font-family="sans-serif" font-weight="bold">${initials}</text></svg>`;
+  if (typeof window !== 'undefined') {
+    return `data:image/svg+xml;base64,${window.btoa(svg)}`;
+  }
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function toChatMessages(msgs: any[], userId: string): ChatMessage[] {
+  return msgs.map((m) => {
+    const senderName = m.sender?.full_name ?? 'Kullanıcı';
+    return {
+      id: m.id,
+      role: m.sender_id === userId ? ('user' as const) : ('assistant' as const),
+      parts: [{ type: 'text' as const, text: m.content }],
+      createdAt: m.created_at,
+      author: {
+        id: m.sender_id,
+        displayName: senderName,
+        role: m.sender_id === userId ? ('user' as const) : ('assistant' as const),
+        avatarUrl: getInitialsAvatar(
+          senderName,
+          m.sender_id === userId ? '#3B82F6' : '#10B981',
+          '#ffffff'
+        ),
+      },
+    };
+  });
+}
+
+export default function MessagesClient({ userId, userName, role, contacts, allUsers, messages }: MessagesClientProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const supabase = createClient();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(searchParams.get('u'));
-  const [newMessage, setNewMessage] = useState('');
-  const [localMessages, setLocalMessages] = useState(messages);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialUserId = searchParams.get('u');
+  const [initialConversationId] = useState<string | undefined>(initialUserId ?? undefined);
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(toChatMessages(messages, userId));
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
 
-  const contactMap = new Map<string, any>();
-  [...contacts, ...allUsers].forEach((u) => contactMap.set(u.id, u));
+  const contactMap = useMemo(() => {
+    const map = new Map<string, any>();
+    allUsers.forEach((u) => map.set(u.id, u));
+    return map;
+  }, [allUsers]);
 
+  // Build conversations from allUsers with unread counts
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [localMessages, selectedUserId]);
+    const unreadCount = (contactId: string) =>
+      messages.filter((m) => m.sender_id === contactId && m.receiver_id === userId && !m.is_read).length;
 
+    const lastMessageAt = (contactId: string) => {
+      const msgs = messages.filter((m) => (m.sender_id === userId && m.receiver_id === contactId) || (m.sender_id === contactId && m.receiver_id === userId));
+      const last = msgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      return last?.created_at;
+    };
+
+    const convs: ChatConversation[] = allUsers.map((u) => {
+      const contactName = u.full_name ?? 'Kullanıcı';
+      return {
+        id: u.id,
+        title: contactName,
+        subtitle: u.role === 'lawyer' ? 'Avukat' : 'Müvekkil',
+        unreadCount: unreadCount(u.id),
+        lastMessageAt: lastMessageAt(u.id),
+        participants: [
+          {
+            id: userId,
+            displayName: userName,
+            role: 'user' as const,
+            avatarUrl: getInitialsAvatar(userName, '#3B82F6', '#ffffff'),
+          },
+          {
+            id: u.id,
+            displayName: contactName,
+            role: 'assistant' as const,
+            avatarUrl: getInitialsAvatar(contactName, '#10B981', '#ffffff'),
+          },
+        ],
+      };
+    });
+    setConversations(convs);
+  }, [allUsers, messages, userId, userName]);
+
+  // Supabase realtime for messages
   useEffect(() => {
     const channel = supabase
-      .channel('messages')
+      .channel('messages-realtime')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const msg = payload.new as any;
           if (msg.sender_id === userId || msg.receiver_id === userId) {
+            const senderName = msg.sender_id === userId ? userName : contactMap.get(msg.sender_id)?.full_name ?? 'Kullanıcı';
             setLocalMessages((prev) => {
               if (prev.find((p) => p.id === msg.id)) return prev;
-              return [msg, ...prev];
+              return [
+                ...prev,
+                {
+                  id: msg.id,
+                  role: msg.sender_id === userId ? ('user' as const) : ('assistant' as const),
+                  parts: [{ type: 'text' as const, text: msg.content }],
+                  createdAt: msg.created_at,
+                  author: {
+                    id: msg.sender_id,
+                    displayName: senderName,
+                    role: msg.sender_id === userId ? ('user' as const) : ('assistant' as const),
+                    avatarUrl: getInitialsAvatar(
+                      senderName,
+                      msg.sender_id === userId ? '#3B82F6' : '#10B981',
+                      '#ffffff'
+                    ),
+                  },
+                },
+              ];
             });
           }
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [supabase, userId]);
+  }, [supabase, userId, contactMap, userName]);
 
-  const threadMessages = selectedUserId
-    ? localMessages
-        .filter((m) => (m.sender_id === userId && m.receiver_id === selectedUserId) || (m.sender_id === selectedUserId && m.receiver_id === userId))
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    : [];
+  const currentUser: ChatUser = useMemo(
+    () => ({
+      id: userId,
+      displayName: userName,
+      role: 'user',
+      avatarUrl: getInitialsAvatar(userName, '#3B82F6', '#ffffff'),
+    }),
+    [userId, userName]
+  );
 
-  const unreadCount = (contactId: string) =>
-    localMessages.filter((m) => m.sender_id === contactId && m.receiver_id === userId && !m.is_read).length;
-
-  const lastMessage = (contactId: string) => {
-    const msgs = localMessages.filter((m) => (m.sender_id === userId && m.receiver_id === contactId) || (m.sender_id === contactId && m.receiver_id === userId));
-    return msgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-  };
-
-  const handleSend = async () => {
-    if (!newMessage.trim() || !selectedUserId) return;
-    const { data } = await supabase.from('messages').insert({
-      sender_id: userId,
-      receiver_id: selectedUserId,
-      content: newMessage.trim(),
-    }).select().single();
-    if (data) {
-      setLocalMessages((prev) => [data, ...prev]);
-    }
-    setNewMessage('');
-  };
-
-  const handleSelect = (id: string) => {
-    setSelectedUserId(id);
-    supabase.from('messages').update({ is_read: true }).eq('sender_id', id).eq('receiver_id', userId).eq('is_read', false);
-  };
+  const adapter: ChatAdapter = useMemo(() => {
+    return {
+      listConversations: async () => ({
+        conversations,
+        hasMore: false,
+      }),
+      listMessages: async ({ conversationId }) => ({
+        messages: localMessages.filter((m) => {
+          const raw = messages.find((rawM) => rawM.id === m.id);
+          if (!raw) return false;
+          return (raw.sender_id === userId && raw.receiver_id === conversationId) || (raw.sender_id === conversationId && raw.receiver_id === userId);
+        }).sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()),
+        hasMore: false,
+      }),
+      sendMessage: async ({ message, conversationId }) => {
+        await supabase.from('messages').insert({
+          sender_id: userId,
+          receiver_id: conversationId,
+          content: message.parts.map((p: any) => (p.type === 'text' ? p.text : '')).join(''),
+        });
+        return new ReadableStream({ start(c) { c.close(); } });
+      },
+      subscribe: async ({ onEvent }) => {
+        const channel = supabase
+          .channel('messages-sub')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+            const msg = payload.new as any;
+            if (msg.sender_id === userId || msg.receiver_id === userId) {
+              const senderName = msg.sender_id === userId ? userName : contactMap.get(msg.sender_id)?.full_name ?? 'Kullanıcı';
+              onEvent({
+                type: 'message-added',
+                message: {
+                  id: msg.id,
+                  role: msg.sender_id === userId ? 'user' : 'assistant',
+                  parts: [{ type: 'text', text: msg.content }],
+                  createdAt: msg.created_at,
+                  author: {
+                    id: msg.sender_id,
+                    displayName: senderName,
+                    role: msg.sender_id === userId ? 'user' : 'assistant',
+                    avatarUrl: getInitialsAvatar(
+                      senderName,
+                      msg.sender_id === userId ? '#3B82F6' : '#10B981',
+                      '#ffffff'
+                    ),
+                  },
+                },
+              } as any);
+            }
+          })
+          .subscribe();
+        return () => { supabase.removeChannel(channel); };
+      },
+    };
+  }, [conversations, localMessages, messages, userId, userName, supabase, contactMap]);
 
   return (
-    <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', gap: 2 }}>
-      {/* Contacts */}
-      <Card sx={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-        <CardContent sx={{ p: 2, flex: 1, overflowY: 'auto' }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Mesajlar</Typography>
-          <List sx={{ p: 0 }}>
-            {allUsers.map((u) => {
-              const unread = unreadCount(u.id);
-              const last = lastMessage(u.id);
-              return (
-                <ListItem
-                  key={u.id}
-                  onClick={() => handleSelect(u.id)}
-                  sx={{
-                    borderRadius: 2,
-                    mb: 0.5,
-                    cursor: 'pointer',
-                    bgcolor: selectedUserId === u.id ? 'action.selected' : 'transparent',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'primary.dark', fontSize: 14 }}>
-                      {(u.full_name?.charAt(0) ?? 'U').toUpperCase()}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: unread > 0 ? 700 : 500 }}>{u.full_name}</Typography>
-                        {unread > 0 && <Badge badgeContent={unread} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }} />}
-                      </Box>
-                    }
-                    secondary={
-                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {last?.content ?? 'Henüz mesaj yok'}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
-          </List>
-        </CardContent>
-      </Card>
-
-      {/* Chat Area */}
-      <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {selectedUserId ? (
-          <>
-            <CardContent sx={{ p: 2, borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Avatar sx={{ bgcolor: 'primary.dark', fontSize: 14, width: 36, height: 36 }}>
-                  {(contactMap.get(selectedUserId)?.full_name?.charAt(0) ?? 'U').toUpperCase()}
-                </Avatar>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{contactMap.get(selectedUserId)?.full_name ?? 'Kullanıcı'}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{contactMap.get(selectedUserId)?.role === 'lawyer' ? 'Avukat' : 'Müvekkil'}</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-
-            <CardContent sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {threadMessages.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Chat sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>Henüz mesaj yok. İlk mesajı siz gönderin.</Typography>
-                </Box>
-              ) : (
-                threadMessages.map((m) => (
-                  <Box key={m.id} sx={{ alignSelf: m.sender_id === userId ? 'flex-end' : 'flex-start', maxWidth: '75%' }}>
-                    <Paper sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      bgcolor: m.sender_id === userId ? 'primary.main' : 'action.hover',
-                      color: m.sender_id === userId ? '#fff' : 'inherit',
-                    }}>
-                      <Typography variant="body2">{m.content}</Typography>
-                    </Paper>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25, textAlign: m.sender_id === userId ? 'right' : 'left' }}>
-                      {new Date(m.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                    </Typography>
-                  </Box>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </CardContent>
-
-            <CardContent sx={{ p: 2, borderTop: 1, borderColor: 'divider', flexShrink: 0 }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  placeholder="Mesajınızı yazın..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  size="small"
-                  multiline
-                  maxRows={3}
-                />
-                <Button variant="contained" onClick={handleSend} disabled={!newMessage.trim()}>
-                  <Send sx={{ fontSize: 18 }} />
-                </Button>
-              </Box>
-            </CardContent>
-          </>
-        ) : (
-          <CardContent sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Chat sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-              <Typography variant="h6" sx={{ color: 'text.secondary', mb: 1 }}>Sohbet Seçin</Typography>
-              <Typography variant="body2" sx={{ color: 'text.disabled' }}>Mesajlaşmak istediğiniz kişiyi soldaki listeden seçin.</Typography>
-            </Box>
-          </CardContent>
-        )}
-      </Card>
+    <Box sx={{ height: 'calc(100vh - 140px)' }}>
+      <Paper sx={{ height: '100%', borderRadius: 3, overflow: 'hidden' }}>
+        <ChatBox
+          adapter={adapter}
+          conversations={conversations}
+          currentUser={currentUser}
+          initialActiveConversationId={initialConversationId}
+          onActiveConversationChange={async (conversationId) => {
+            if (!conversationId) return;
+            const { error } = await supabase.from('messages').update({ is_read: true }).eq('sender_id', conversationId).eq('receiver_id', userId).eq('is_read', false);
+            if (error) console.error('markRead error:', error);
+            setConversations((prev) =>
+              prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
+            );
+            router.refresh();
+          }}
+          features={{
+            scrollToBottom: true,
+            conversationHeader: true,
+            attachments: false,
+            helperText: false,
+            suggestions: false,
+          }}
+          slotProps={{
+            messageGroup: {
+              slots: {
+                authorName: () => null,
+              },
+            },
+          }}
+          sx={{ height: '100%' }}
+        />
+      </Paper>
     </Box>
   );
 }
