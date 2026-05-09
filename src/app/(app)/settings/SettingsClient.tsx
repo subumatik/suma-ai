@@ -52,10 +52,10 @@ export default function SettingsClient({ profile, userId }: SettingsClientProps)
 
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto' }}>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>Profil</Typography>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, fontSize: { xs: '1.5rem', md: '2rem' } }}>Profil</Typography>
 
       <Card>
-        <CardContent sx={{ p: 4 }}>
+        <CardContent sx={{ p: { xs: 2, md: 4 } }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
             <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.dark', fontSize: 32, fontWeight: 700, mx: 'auto', mb: 2 }}>
               {(form.full_name?.charAt(0) ?? 'U').toUpperCase()}

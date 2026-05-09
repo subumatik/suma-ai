@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Box, Card, CardContent, Typography, Button, Chip, Avatar, Grid, Paper, Stack } from '@mui/material';
+import { Box, Card, CardContent, Typography, Button, Chip, Avatar, Grid, Paper, Stack, useMediaQuery, useTheme } from '@mui/material';
 import {
   Folder, CalendarMonth, Chat, People, CheckCircle, Schedule,
   ArrowForward, Gavel, Notifications,
@@ -23,6 +23,10 @@ interface DashboardClientProps {
 
 export default function DashboardClient({ role, profile, dosyalar, appointments, hearings, unreadMessages, totalUsers, totalDosyalar, categories, statuses }: DashboardClientProps) {
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const chartWidth = isMobile ? 320 : 400;
+  const chartHeight = isMobile ? 240 : 280;
 
   const isLawyer = role === 'lawyer';
   const isAdmin = role === 'admin';
@@ -179,7 +183,12 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
                           <Gavel fontSize="inherit" /> {d.file_number ?? 'Belirtilmemiş'}
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <People fontSize="inherit" /> {isLawyer ? d.client?.full_name : d.lawyer?.full_name}
+                          <People fontSize="inherit" /> {(() => {
+                            const dosyaLawyers = (d.lawyers ?? []).map((l: any) => l.lawyer).filter(Boolean);
+                            const dosyaClients = (d.clients ?? []).map((c: any) => c.client).filter(Boolean);
+                            const targetList = isLawyer ? dosyaClients : dosyaLawyers;
+                            return targetList.map((p: any) => p.full_name).filter(Boolean).join(', ') || '-';
+                          })()}
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Folder fontSize="inherit" /> {d.category?.name ?? 'Kategorisiz'}
@@ -321,8 +330,8 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
                         cornerRadius: 4,
                       },
                     ]}
-                    width={400}
-                    height={280}
+                    width={chartWidth}
+                    height={chartHeight}
                   />
                 </Box>
               )}
@@ -353,8 +362,8 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
                         cornerRadius: 4,
                       },
                     ]}
-                    width={400}
-                    height={280}
+                    width={chartWidth}
+                    height={chartHeight}
                   />
                 </Box>
               )}

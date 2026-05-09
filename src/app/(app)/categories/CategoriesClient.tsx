@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   Box, Card, CardContent, Typography, Button, TextField, Chip,
-  List, ListItem, ListItemText, IconButton, Dialog, DialogTitle,
+  IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Grid,
+  useMediaQuery, useTheme,
 } from '@mui/material';
 import { Add, Delete, Category } from '@mui/icons-material';
 
@@ -20,6 +21,8 @@ interface CategoriesClientProps {
 export default function CategoriesClient({ categories, userId }: CategoriesClientProps) {
   const router = useRouter();
   const supabase = createClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [open, setOpen] = useState(false);
   const [newCat, setNewCat] = useState({ name: '', color: DEFAULT_COLORS[0] });
   const [loading, setLoading] = useState(false);
@@ -47,9 +50,9 @@ export default function CategoriesClient({ categories, userId }: CategoriesClien
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>Kategoriler</Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}>Yeni Kategori</Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', md: '2rem' } }}>Kategoriler</Typography>
+        <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)} fullWidth={isMobile}>Yeni Kategori</Button>
       </Box>
 
       <Grid container spacing={2}>
@@ -80,7 +83,7 @@ export default function CategoriesClient({ categories, userId }: CategoriesClien
         </Box>
       )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth fullScreen={isMobile}>
         <DialogTitle>Yeni Kategori</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField label="Kategori Adı" fullWidth value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} />
@@ -98,7 +101,7 @@ export default function CategoriesClient({ categories, userId }: CategoriesClien
             ))}
           </Box>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, '& > button': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setOpen(false)}>İptal</Button>
           <Button variant="contained" onClick={handleCreate} disabled={loading || !newCat.name.trim()}>Ekle</Button>
         </DialogActions>

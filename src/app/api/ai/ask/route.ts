@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Dosya verilerini çek
     const [{ data: dosya }, { data: documents }, { data: statusUpdates }, { data: messages }] = await Promise.all([
-      supabase.from('dosyalar').select('*, client:client_id(full_name), lawyer:lawyer_id(full_name), category:category_id(name), status:status_id(name)').eq('id', dosyaId).single(),
+      supabase.from('dosyalar').select('*, lawyers:dosya_lawyers(lawyer:lawyer_id(id, full_name)), clients:dosya_clients(client:client_id(id, full_name)), category:category_id(name), status:status_id(name)').eq('id', dosyaId).single(),
       supabase.from('dosya_documents').select('file_name, description, created_at').eq('dosya_id', dosyaId).order('created_at', { ascending: false }).limit(20),
       supabase.from('dosya_status_updates').select('*, status:status_id(name)').eq('dosya_id', dosyaId).order('created_at', { ascending: false }).limit(20),
       supabase.from('messages').select('content, sender_id, created_at').eq('dosya_id', dosyaId).order('created_at', { ascending: false }).limit(20),
@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 404 });
     }
 
+    const lawyersList: any[] = (dosya.lawyers ?? []).map((l: any) => l.lawyer).filter(Boolean);
+    const clientsList: any[] = (dosya.clients ?? []).map((c: any) => c.client).filter(Boolean);
+    const lawyerIds = new Set(lawyersList.map((l) => l.id));
+
     // 3. Context oluştur
     let context = `DOSYA BİLGİLERİ:\n`;
     context += `Başlık: ${dosya.title}\n`;
@@ -58,8 +62,8 @@ export async function POST(request: NextRequest) {
     context += `Durum: ${dosya.status?.name ?? 'Belirtilmemiş'}\n`;
     context += `Mahkeme: ${dosya.court_name ?? 'Belirtilmemiş'}\n`;
     context += `Mahkeme Dosya No: ${dosya.court_file_no ?? 'Belirtilmemiş'}\n`;
-    context += `Avukat: ${dosya.lawyer?.full_name ?? 'Bilinmiyor'}\n`;
-    context += `Müvekkil: ${dosya.client?.full_name ?? 'Bilinmiyor'}\n`;
+    context += `Avukat(lar): ${lawyersList.map((l) => l.full_name).filter(Boolean).join(', ') || 'Bilinmiyor'}\n`;
+    context += `Müvekkil(ler): ${clientsList.map((c) => c.full_name).filter(Boolean).join(', ') || 'Bilinmiyor'}\n`;
     context += `Açıklama: ${dosya.description ?? 'Yok'}\n\n`;
 
     if (documents && documents.length > 0) {
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (messages && messages.length > 0) {
       context += `SON MESAJLAR:\n`;
       messages.forEach((m) => {
-        context += `- ${m.sender_id === dosya.lawyer_id ? 'Avukat' : 'Müvekkil'}: ${m.content}\n`;
+        context += `- ${lawyerIds.has(m.sender_id) ? 'Avukat' : 'Müvekkil'}: ${m.content}\n`;
       });
       context += `\n`;
     }

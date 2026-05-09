@@ -28,17 +28,17 @@ export default function AdminDashboardClient({ stats, recentUsers }: AdminDashbo
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>Yönetim Paneli</Typography>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, fontSize: { xs: '1.5rem', md: '2rem' } }}>Yönetim Paneli</Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {statCards.map((s) => (
           <Grid size={{ xs: 12, sm: 6, md: 3 }} key={s.label}>
             <Card>
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: `${s.color}20`, color: s.color, width: 48, height: 48 }}>{s.icon}</Avatar>
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{s.value}</Typography>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', md: '2rem' } }}>{s.value}</Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>{s.label}</Typography>
                   </Box>
                 </Box>

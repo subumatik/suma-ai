@@ -11,14 +11,28 @@ export default async function MessagesPage() {
   const role = profile?.role ?? 'client';
   const userName = profile?.full_name ?? 'Kullanıcı';
 
-  // Fetch connected users through dosyalar (cases)
+  // Find dosyalar the user is on, then derive connected users
   let connectedUserIds: string[] = [];
+
   if (role === 'client') {
-    const { data: dosyalar } = await supabase.from('dosyalar').select('lawyer_id').eq('client_id', user.id);
-    connectedUserIds = [...new Set((dosyalar ?? []).map((d) => d.lawyer_id).filter(Boolean))];
-  } else {
-    const { data: dosyalar } = await supabase.from('dosyalar').select('client_id').eq('lawyer_id', user.id);
-    connectedUserIds = [...new Set((dosyalar ?? []).map((d) => d.client_id).filter(Boolean))];
+    const { data: clientLinks } = await supabase.from('dosya_clients').select('dosya_id').eq('client_id', user.id);
+    const dosyaIds = (clientLinks ?? []).map((c) => c.dosya_id);
+    if (dosyaIds.length > 0) {
+      const { data: lawyerLinks } = await supabase.from('dosya_lawyers').select('lawyer_id').in('dosya_id', dosyaIds);
+      connectedUserIds = [...new Set((lawyerLinks ?? []).map((l) => l.lawyer_id).filter(Boolean))];
+    }
+  } else if (role === 'lawyer') {
+    const { data: lawyerLinks } = await supabase.from('dosya_lawyers').select('dosya_id').eq('lawyer_id', user.id);
+    const dosyaIds = (lawyerLinks ?? []).map((l) => l.dosya_id);
+    if (dosyaIds.length > 0) {
+      // All clients on shared dosyalar
+      const { data: clientLinks } = await supabase.from('dosya_clients').select('client_id').in('dosya_id', dosyaIds);
+      const clientIds = (clientLinks ?? []).map((c) => c.client_id).filter(Boolean);
+      // Other lawyers on shared dosyalar
+      const { data: otherLawyerLinks } = await supabase.from('dosya_lawyers').select('lawyer_id').in('dosya_id', dosyaIds);
+      const otherLawyerIds = (otherLawyerLinks ?? []).map((l) => l.lawyer_id).filter((id) => id !== user.id);
+      connectedUserIds = [...new Set([...clientIds, ...otherLawyerIds])];
+    }
   }
 
   // Fetch connected lawyers through lawyer_connections

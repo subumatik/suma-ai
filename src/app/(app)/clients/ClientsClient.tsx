@@ -34,8 +34,8 @@ export default function ClientsClient({ clients, role, referansKodu }: ClientsCl
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>Müvekkillerim</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', md: '2rem' } }}>Müvekkillerim</Typography>
       </Box>
 
       {role === 'lawyer' && referansKodu && (
@@ -98,9 +98,9 @@ export default function ClientsClient({ clients, role, referansKodu }: ClientsCl
 
       <Grid container spacing={2}>
         {filtered.map((c) => (
-          <Grid size={{ xs: 12, md: 6, lg: 4 }} key={c.id}>
+          <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={c.id}>
             <Card sx={{ cursor: 'pointer', height: '100%' }} onClick={() => router.push(`/messages?u=${c.id}`)}>
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                   <Avatar sx={{ bgcolor: 'secondary.dark', width: 56, height: 56, fontSize: 20, fontWeight: 700 }}>
                     {(c.full_name?.charAt(0) ?? 'M').toUpperCase()}

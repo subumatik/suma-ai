@@ -192,16 +192,22 @@ export async function POST(req: Request) {
           continue;
         }
 
-        const { error: dosyaError } = await supabaseAdmin.from('dosyalar').insert({
+        const { data: createdDosya, error: dosyaError } = await supabaseAdmin.from('dosyalar').insert({
           title: 'Genel Hukuki Danışmanlık',
           description: `${fullName} tarafından referans kodu ile oluşturulan dava kaydı.`,
-          lawyer_id: lawyer.id,
-          client_id: userId,
           status_id: statusId,
-        });
+        }).select('id').single();
 
-        if (dosyaError) {
+        if (dosyaError || !createdDosya) {
           console.error('Automatic dosya creation error:', dosyaError);
+          continue;
+        }
+
+        const { error: lawyerLinkError } = await supabaseAdmin.from('dosya_lawyers').insert({ dosya_id: createdDosya.id, lawyer_id: lawyer.id });
+        const { error: clientLinkError } = await supabaseAdmin.from('dosya_clients').insert({ dosya_id: createdDosya.id, client_id: userId });
+        if (lawyerLinkError || clientLinkError) {
+          console.error('Automatic dosya link error:', lawyerLinkError || clientLinkError);
+          await supabaseAdmin.from('dosyalar').delete().eq('id', createdDosya.id);
         }
       }
     }

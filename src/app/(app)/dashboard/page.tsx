@@ -19,47 +19,62 @@ export default async function DashboardPage() {
   let categories: any[] = [];
   let statuses: any[] = [];
 
-  if (role === 'lawyer') {
-    const [{ data: d }, { data: a }, { count: um }, { data: cat }, { data: st }] = await Promise.all([
-      supabase.from('dosyalar').select('*, client:client_id(full_name), category:category_id(name,color), status:status_id(name,color)').eq('lawyer_id', user.id).order('updated_at', { ascending: false }).limit(5),
-      supabase.from('appointments').select('*').eq('lawyer_id', user.id).gte('appointment_date', new Date().toISOString()).order('appointment_date', { ascending: true }).limit(5),
-      supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('is_read', false),
-      supabase.from('categories').select('*').or(`is_system.eq.true,created_by.eq.${user.id}`),
-      supabase.from('statuses').select('*').or(`is_system.eq.true,created_by.eq.${user.id}`).order('order', { ascending: true }),
-    ]);
-    dosyalar = d ?? [];
-    appointments = a ?? [];
-    unreadMessages = um ?? 0;
-    categories = cat ?? [];
-    statuses = st ?? [];
-    const hearingDosyaIds = dosyalar.map((d) => d.id);
-    if (hearingDosyaIds.length > 0) {
-      const { data: h } = await supabase.from('hearings').select('*, dosya:dosya_id(title)').in('dosya_id', hearingDosyaIds).gte('hearing_date', new Date().toISOString()).order('hearing_date', { ascending: true }).limit(5);
-      hearings = h ?? [];
+  if (role === 'lawyer' || role === 'client') {
+    // Find dosya IDs the user is connected to
+    let dosyaIds: string[] = [];
+    if (role === 'lawyer') {
+      const { data } = await supabase.from('dosya_lawyers').select('dosya_id').eq('lawyer_id', user.id);
+      dosyaIds = (data ?? []).map((d) => d.dosya_id);
+    } else {
+      const { data } = await supabase.from('dosya_clients').select('dosya_id').eq('client_id', user.id);
+      dosyaIds = (data ?? []).map((d) => d.dosya_id);
     }
-  } else if (role === 'client') {
+
+    const dosyalarPromise = dosyaIds.length > 0
+      ? supabase
+          .from('dosyalar')
+          .select('*, lawyers:dosya_lawyers(lawyer:lawyer_id(id, full_name)), clients:dosya_clients(client:client_id(id, full_name)), category:category_id(name,color), status:status_id(name,color)')
+          .in('id', dosyaIds)
+          .order('updated_at', { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: [] });
+
+    const apptQuery = role === 'lawyer'
+      ? supabase.from('appointments').select('*').eq('lawyer_id', user.id).gte('appointment_date', new Date().toISOString()).order('appointment_date', { ascending: true }).limit(5)
+      : supabase.from('appointments').select('*').eq('client_id', user.id).gte('appointment_date', new Date().toISOString()).order('appointment_date', { ascending: true }).limit(5);
+
     const [{ data: d }, { data: a }, { count: um }, { data: cat }, { data: st }] = await Promise.all([
-      supabase.from('dosyalar').select('*, lawyer:lawyer_id(full_name), category:category_id(name,color), status:status_id(name,color)').eq('client_id', user.id).order('updated_at', { ascending: false }).limit(5),
-      supabase.from('appointments').select('*').eq('client_id', user.id).gte('appointment_date', new Date().toISOString()).order('appointment_date', { ascending: true }).limit(5),
+      dosyalarPromise,
+      apptQuery,
       supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('is_read', false),
-      supabase.from('categories').select('*'),
-      supabase.from('statuses').select('*').order('order', { ascending: true }),
+      role === 'lawyer'
+        ? supabase.from('categories').select('*').or(`is_system.eq.true,created_by.eq.${user.id}`)
+        : supabase.from('categories').select('*'),
+      role === 'lawyer'
+        ? supabase.from('statuses').select('*').or(`is_system.eq.true,created_by.eq.${user.id}`).order('order', { ascending: true })
+        : supabase.from('statuses').select('*').order('order', { ascending: true }),
     ]);
     dosyalar = d ?? [];
     appointments = a ?? [];
     unreadMessages = um ?? 0;
     categories = cat ?? [];
     statuses = st ?? [];
-    const hearingDosyaIds = dosyalar.map((d) => d.id);
-    if (hearingDosyaIds.length > 0) {
-      const { data: h } = await supabase.from('hearings').select('*, dosya:dosya_id(title)').in('dosya_id', hearingDosyaIds).gte('hearing_date', new Date().toISOString()).order('hearing_date', { ascending: true }).limit(5);
+
+    if (dosyaIds.length > 0) {
+      const { data: h } = await supabase
+        .from('hearings')
+        .select('*, dosya:dosya_id(title)')
+        .in('dosya_id', dosyaIds)
+        .gte('hearing_date', new Date().toISOString())
+        .order('hearing_date', { ascending: true })
+        .limit(5);
       hearings = h ?? [];
     }
   } else if (role === 'admin') {
     const [{ count: tu }, { count: td }, { data: d }, { data: cat }, { data: st }] = await Promise.all([
       supabase.from('profiles').select('*', { count: 'exact', head: true }),
       supabase.from('dosyalar').select('*', { count: 'exact', head: true }),
-      supabase.from('dosyalar').select('*, client:client_id(full_name), category:category_id(name,color), status:status_id(name,color)').order('updated_at', { ascending: false }).limit(5),
+      supabase.from('dosyalar').select('*, lawyers:dosya_lawyers(lawyer:lawyer_id(id, full_name)), clients:dosya_clients(client:client_id(id, full_name)), category:category_id(name,color), status:status_id(name,color)').order('updated_at', { ascending: false }).limit(5),
       supabase.from('categories').select('*'),
       supabase.from('statuses').select('*').order('order', { ascending: true }),
     ]);

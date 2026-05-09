@@ -67,13 +67,15 @@ export async function POST() {
 
       if (status?.id && lawyers?.length) {
         for (const lawyer of lawyers) {
-          await supabase.from('dosyalar').insert({
+          const { data: created } = await supabase.from('dosyalar').insert({
             title: 'Genel Hukuki Danismanlik',
             description: 'Ornek muvekkil tarafindan referans kodu ile olusturulan dosya kaydi.',
-            lawyer_id: lawyer.id,
-            client_id: muvekkilUser.user.id,
             status_id: status.id,
-          });
+          }).select('id').single();
+          if (created?.id) {
+            await supabase.from('dosya_lawyers').insert({ dosya_id: created.id, lawyer_id: lawyer.id });
+            await supabase.from('dosya_clients').insert({ dosya_id: created.id, client_id: muvekkilUser.user.id });
+          }
         }
       }
     }

@@ -76,17 +76,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profil olusturulamadi' }, { status: 500 });
     }
 
-    const { error: dosyaError } = await admin.from('dosyalar').insert({
+    const { data: createdDosya, error: dosyaError } = await admin.from('dosyalar').insert({
       title: 'Genel Hukuki Danismanlik',
       description: `${fullName} icin avukat tarafindan olusturulan dosya kaydi.`,
-      lawyer_id: user.id,
-      client_id: newUser.user.id,
       status_id: defaultStatus.id,
-    });
+    }).select('id').single();
 
-    if (dosyaError) {
+    if (dosyaError || !createdDosya) {
       await admin.auth.admin.deleteUser(newUser.user.id);
       return NextResponse.json({ error: 'Dosya kaydi olusturulamadi' }, { status: 500 });
+    }
+
+    const { error: linkError } = await admin.from('dosya_lawyers').insert({ dosya_id: createdDosya.id, lawyer_id: user.id });
+    const { error: clientLinkError } = await admin.from('dosya_clients').insert({ dosya_id: createdDosya.id, client_id: newUser.user.id });
+    if (linkError || clientLinkError) {
+      await admin.from('dosyalar').delete().eq('id', createdDosya.id);
+      await admin.auth.admin.deleteUser(newUser.user.id);
+      return NextResponse.json({ error: 'Dosya baglantisi olusturulamadi' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, userId: newUser.user.id });

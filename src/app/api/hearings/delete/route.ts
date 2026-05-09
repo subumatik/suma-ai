@@ -14,8 +14,13 @@ export async function DELETE(req: Request) {
     const { data: hearing } = await supabase.from('hearings').select('dosya_id').eq('id', id).single();
     if (!hearing) return NextResponse.json({ error: 'Duruşma bulunamadı' }, { status: 404 });
 
-    const { data: dosya } = await supabase.from('dosyalar').select('lawyer_id').eq('id', hearing.dosya_id).single();
-    if (!dosya || dosya.lawyer_id !== user.id) {
+    const { data: lawyerLink } = await supabase
+      .from('dosya_lawyers')
+      .select('id')
+      .eq('dosya_id', hearing.dosya_id)
+      .eq('lawyer_id', user.id)
+      .maybeSingle();
+    if (!lawyerLink) {
       return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 });
     }
 

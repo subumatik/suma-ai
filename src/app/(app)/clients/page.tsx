@@ -13,19 +13,28 @@ export default async function ClientsPage() {
   let clients: any[] = [];
 
   if (role === 'lawyer') {
-    const { data: caseClients } = await supabase
-      .from('dosyalar')
-      .select('client_id')
+    // Find dosyalar where this user is a lawyer
+    const { data: lawyerLinks } = await supabase
+      .from('dosya_lawyers')
+      .select('dosya_id')
       .eq('lawyer_id', user.id);
-    const clientIds = Array.from(new Set(caseClients?.map((c) => c.client_id) ?? []));
+    const dosyaIds = (lawyerLinks ?? []).map((l) => l.dosya_id);
 
-    if (clientIds.length > 0) {
-      const { data: c } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone')
-        .in('id', clientIds)
-        .eq('role', 'client');
-      clients = c ?? [];
+    if (dosyaIds.length > 0) {
+      const { data: clientLinks } = await supabase
+        .from('dosya_clients')
+        .select('client_id')
+        .in('dosya_id', dosyaIds);
+      const clientIds = Array.from(new Set((clientLinks ?? []).map((c) => c.client_id)));
+
+      if (clientIds.length > 0) {
+        const { data: c } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, phone')
+          .in('id', clientIds)
+          .eq('role', 'client');
+        clients = c ?? [];
+      }
     }
   } else if (role === 'client') {
     const { data: c } = await supabase.from('profiles').select('id, full_name, email, phone').eq('id', user.id);

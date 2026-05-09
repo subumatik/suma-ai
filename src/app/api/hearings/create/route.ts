@@ -13,10 +13,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Dosya ve duruşma tarihi zorunludur' }, { status: 400 });
     }
 
-    // Verify user is the lawyer on this case
-    const { data: dosya } = await supabase.from('dosyalar').select('lawyer_id, client_id, title').eq('id', dosya_id).single();
+    // Verify user is a lawyer on this case
+    const { data: dosya } = await supabase.from('dosyalar').select('id, title').eq('id', dosya_id).single();
     if (!dosya) return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 404 });
-    if (dosya.lawyer_id !== user.id) {
+    const { data: lawyerLink } = await supabase
+      .from('dosya_lawyers')
+      .select('id')
+      .eq('dosya_id', dosya_id)
+      .eq('lawyer_id', user.id)
+      .maybeSingle();
+    if (!lawyerLink) {
       return NextResponse.json({ error: 'Bu dosyaya duruşma ekleme yetkiniz yok' }, { status: 403 });
     }
 

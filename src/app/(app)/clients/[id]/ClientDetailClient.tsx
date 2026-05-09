@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 import {
   Box, Card, CardContent, Typography, Button, Chip, Grid, Avatar,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+  useMediaQuery, useTheme,
 } from '@mui/material';
-import { Person, Add, Folder, Mail, Phone, ArrowBack } from '@mui/icons-material';
+import { Add, Folder, Mail, Phone, ArrowBack } from '@mui/icons-material';
 
 interface Props {
   client: any;
@@ -20,6 +21,8 @@ interface Props {
 export default function ClientDetailClient({ client, dosyalar, statuses, role, userId }: Props) {
   const router = useRouter();
   const supabase = createClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [newDosya, setNewDosya] = useState({ title: '', description: '', file_number: '', court_name: '', status_id: '' });
@@ -27,11 +30,19 @@ export default function ClientDetailClient({ client, dosyalar, statuses, role, u
   const handleCreate = async () => {
     if (!newDosya.title || !newDosya.status_id) return;
     setLoading(true);
-    await supabase.from('dosyalar').insert({
-      ...newDosya,
-      lawyer_id: userId,
-      client_id: client.id,
-    });
+    const { data: created, error } = await supabase.from('dosyalar').insert({
+      title: newDosya.title,
+      description: newDosya.description || null,
+      file_number: newDosya.file_number || null,
+      court_name: newDosya.court_name || null,
+      status_id: newDosya.status_id,
+    }).select('id').single();
+
+    if (!error && created) {
+      await supabase.from('dosya_lawyers').insert({ dosya_id: created.id, lawyer_id: userId });
+      await supabase.from('dosya_clients').insert({ dosya_id: created.id, client_id: client.id });
+    }
+
     setLoading(false);
     setOpen(false);
     setNewDosya({ title: '', description: '', file_number: '', court_name: '', status_id: '' });
@@ -45,13 +56,13 @@ export default function ClientDetailClient({ client, dosyalar, statuses, role, u
       <Button onClick={() => router.push('/clients')} sx={{ mb: 2 }} startIcon={<ArrowBack />}>Müvekkillere Dön</Button>
 
       <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <Avatar sx={{ width: 72, height: 72, bgcolor: 'secondary.dark', fontSize: 28, fontWeight: 700 }}>
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+            <Avatar sx={{ width: { xs: 56, md: 72 }, height: { xs: 56, md: 72 }, bgcolor: 'secondary.dark', fontSize: { xs: 22, md: 28 }, fontWeight: 700 }}>
               {(client.full_name?.charAt(0) ?? 'M').toUpperCase()}
             </Avatar>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>{client.full_name ?? 'İsimsiz'}</Typography>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', md: '2rem' }, wordBreak: 'break-word' }}>{client.full_name ?? 'İsimsiz'}</Typography>
               <Chip label="Müvekkil" color="primary" variant="outlined" size="small" />
             </Box>
           </Box>
@@ -72,10 +83,10 @@ export default function ClientDetailClient({ client, dosyalar, statuses, role, u
         </CardContent>
       </Card>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Dosyalar</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Dosyalar</Typography>
         {role === 'lawyer' && (
-          <Button variant="contained" startIcon={<Add />} onClick={() => { setNewDosya({ ...newDosya, status_id: defaultStatus }); setOpen(true); }}>
+          <Button variant="contained" startIcon={<Add />} onClick={() => { setNewDosya({ ...newDosya, status_id: defaultStatus }); setOpen(true); }} fullWidth={isMobile}>
             Yeni Dosya Aç
           </Button>
         )}
@@ -85,7 +96,7 @@ export default function ClientDetailClient({ client, dosyalar, statuses, role, u
         {dosyalar.map((d) => (
           <Grid size={{ xs: 12, md: 6 }} key={d.id}>
             <Card sx={{ cursor: 'pointer' }} onClick={() => router.push(`/cases/${d.id}`)}>
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{d.title}</Typography>
                   <Chip size="small" label={d.status?.name ?? '-'} sx={{ bgcolor: (d.status?.color ?? '#3B82F6') + '20', color: d.status?.color ?? '#3B82F6' }} />
@@ -105,7 +116,7 @@ export default function ClientDetailClient({ client, dosyalar, statuses, role, u
         </Box>
       )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
         <DialogTitle>Yeni Dosya Aç</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField label="Dosya Başlığı" fullWidth value={newDosya.title} onChange={(e) => setNewDosya({ ...newDosya, title: e.target.value })} />
@@ -119,7 +130,7 @@ export default function ClientDetailClient({ client, dosyalar, statuses, role, u
             ))}
           </TextField>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, '& > button': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setOpen(false)}>İptal</Button>
           <Button variant="contained" onClick={handleCreate} disabled={loading || !newDosya.title || !newDosya.status_id}>Oluştur</Button>
         </DialogActions>

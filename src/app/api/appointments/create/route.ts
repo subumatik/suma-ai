@@ -9,10 +9,32 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { lawyer_id, client_id, appointment_date, duration_minutes, topic, notes, status } = body;
+    const { lawyer_id, client_id, dosya_id, appointment_date, duration_minutes, topic, notes, status } = body;
 
     if (!lawyer_id || !client_id || !appointment_date || !topic) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Verify lawyer-client connection via junction tables
+    const { data: lawyerCases } = await supabase
+      .from('dosya_lawyers')
+      .select('dosya_id')
+      .eq('lawyer_id', lawyer_id);
+    const lawyerCaseIds = (lawyerCases ?? []).map((c) => c.dosya_id);
+
+    if (lawyerCaseIds.length === 0) {
+      return NextResponse.json({ error: 'Bu avukatla bağlantınız bulunmamaktadır.' }, { status: 403 });
+    }
+
+    const { data: connection } = await supabase
+      .from('dosya_clients')
+      .select('dosya_id')
+      .eq('client_id', client_id)
+      .in('dosya_id', lawyerCaseIds)
+      .maybeSingle();
+
+    if (!connection) {
+      return NextResponse.json({ error: 'Bu avukatla bağlantınız bulunmamaktadır.' }, { status: 403 });
     }
 
     const appointmentStatus = status === 'CONFIRMED' ? 'CONFIRMED' : 'REQUESTED';
@@ -23,6 +45,7 @@ export async function POST(req: Request) {
       .insert({
         lawyer_id,
         client_id,
+        dosya_id: dosya_id || null,
         appointment_date,
         duration_minutes: duration_minutes ?? 60,
         topic,

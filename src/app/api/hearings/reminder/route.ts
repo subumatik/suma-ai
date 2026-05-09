@@ -13,14 +13,17 @@ export async function POST(req: Request) {
 
     const { data: hearing } = await supabase
       .from('hearings')
-      .select('*, dosya:dosya_id(title, lawyer_id, client_id, lawyer:lawyer_id(full_name, email), client:client_id(full_name, email))')
+      .select('*, dosya:dosya_id(title, lawyers:dosya_lawyers(lawyer:lawyer_id(id, full_name, email)), clients:dosya_clients(client:client_id(id, full_name, email)))')
       .eq('id', hearing_id)
       .single();
 
     if (!hearing) return NextResponse.json({ error: 'Duruşma bulunamadı' }, { status: 404 });
 
     const dosya = hearing.dosya as any;
-    if (dosya.lawyer_id !== user.id) {
+    const lawyers: any[] = (dosya?.lawyers ?? []).map((l: any) => l.lawyer).filter(Boolean);
+    const clients: any[] = (dosya?.clients ?? []).map((c: any) => c.client).filter(Boolean);
+    const isAuthorizedLawyer = lawyers.some((l) => l.id === user.id);
+    if (!isAuthorizedLawyer) {
       return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 403 });
     }
 
@@ -39,15 +42,13 @@ export async function POST(req: Request) {
     `;
 
     const sentTo: string[] = [];
-
-    if (dosya.lawyer?.email) {
-      await sendEmail(dosya.lawyer.email, subject, 'Duruşma Hatırlatması', body);
-      sentTo.push(dosya.lawyer.email);
-    }
-
-    if (dosya.client?.email) {
-      await sendEmail(dosya.client.email, subject, 'Duruşma Hatırlatması', body);
-      sentTo.push(dosya.client.email);
+    const allRecipients = [...lawyers, ...clients];
+    const seen = new Set<string>();
+    for (const r of allRecipients) {
+      if (!r?.email || seen.has(r.email)) continue;
+      seen.add(r.email);
+      await sendEmail(r.email, subject, 'Duruşma Hatırlatması', body);
+      sentTo.push(r.email);
     }
 
     await supabase.from('hearings').update({ reminder_email_sent: true }).eq('id', hearing_id);

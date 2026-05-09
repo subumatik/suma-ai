@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Box, Card, CardContent, Typography, Button, TextField, Grid,
   Avatar, Chip, InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions,
-  Snackbar, Alert,
+  Snackbar, Alert, useMediaQuery, useTheme,
 } from '@mui/material';
 import { Person, Search, CalendarMonth, Mail, Phone, Add } from '@mui/icons-material';
 
@@ -17,6 +17,8 @@ interface LawyersClientProps {
 
 export default function LawyersClient({ lawyers, userId, role }: LawyersClientProps) {
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [search, setSearch] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [refCode, setRefCode] = useState('');
@@ -56,10 +58,10 @@ export default function LawyersClient({ lawyers, userId, role }: LawyersClientPr
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>Avukatlar</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', md: '2rem' } }}>Avukatlar</Typography>
         {role === 'client' && (
-          <Button variant="contained" startIcon={<Add />} onClick={() => setOpenDialog(true)}>
+          <Button variant="contained" startIcon={<Add />} onClick={() => setOpenDialog(true)} fullWidth={isMobile}>
             Avukat Ekle
           </Button>
         )}
@@ -84,9 +86,9 @@ export default function LawyersClient({ lawyers, userId, role }: LawyersClientPr
 
       <Grid container spacing={2}>
         {filtered.map((l) => (
-          <Grid size={{ xs: 12, md: 6, lg: 4 }} key={l.id}>
+          <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={l.id}>
             <Card sx={{ height: '100%' }}>
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                   <Avatar sx={{ bgcolor: 'primary.dark', width: 56, height: 56, fontSize: 20, fontWeight: 700 }}>
                     {(l.full_name?.charAt(0) ?? 'A').toUpperCase()}
@@ -117,7 +119,7 @@ export default function LawyersClient({ lawyers, userId, role }: LawyersClientPr
                   </Box>
                 )}
 
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
                   <Button variant="contained" fullWidth startIcon={<CalendarMonth />} onClick={() => router.push(`/appointments?lawyer=${l.id}`)}>
                     Randevu Al
                   </Button>
@@ -138,7 +140,7 @@ export default function LawyersClient({ lawyers, userId, role }: LawyersClientPr
         </Box>
       )}
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
         <DialogTitle>Avukat Ekle</DialogTitle>
         <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
@@ -154,7 +156,7 @@ export default function LawyersClient({ lawyers, userId, role }: LawyersClientPr
             slotProps={{ inputLabel: { shrink: true } }}
           />
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, '& > button': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setOpenDialog(false)}>İptal</Button>
           <Button variant="contained" onClick={handleConnect} disabled={connectLoading || !refCode.trim()}>
             {connectLoading ? 'Ekleniyor...' : 'Ekle'}

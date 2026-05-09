@@ -35,6 +35,42 @@ let cachedCookies: Record<string, string> | null = null;
 let cachedAt = 0;
 const COOKIE_TTL_MS = 1000 * 60 * 10;
 
+/**
+ * Response header'larından set-cookie değerlerini güvenilir şekilde çıkarır.
+ * getSetCookie() desteklemeyen runtime'lar (Edge Runtime, eski Node.js) için
+ * headers.get('set-cookie') fallback'i de içerir.
+ */
+function extractCookies(res: Response): Record<string, string> {
+  const cookies: Record<string, string> = {};
+
+  // Modern yöntem (Node.js 18.14+, modern runtimes)
+  if (typeof res.headers.getSetCookie === "function") {
+    const setCookie = res.headers.getSetCookie();
+    for (const c of setCookie) {
+      const [kv] = c.split(";");
+      const [k, v] = kv.split("=");
+      if (k && v) cookies[k.trim()] = v.trim();
+    }
+    return cookies;
+  }
+
+  // Fallback: set-cookie header'ını string olarak al ve parse et.
+  // Birden fazla cookie virgülle ayrılmış olabilir.
+  const setCookieHeader = res.headers.get("set-cookie");
+  if (setCookieHeader) {
+    // Cookie isimleri = içerir; Expires tarihlerindeki virgülleri atlamak için
+    // virgülden hemen sonra bir cookie ismi (anahtar=değer) geldiğinde böl.
+    const parts = setCookieHeader.split(/,(?=[^;]*=)/);
+    for (const c of parts) {
+      const [kv] = c.split(";");
+      const [k, v] = kv.split("=");
+      if (k && v) cookies[k.trim()] = v.trim();
+    }
+  }
+
+  return cookies;
+}
+
 async function fetchSessionCookies(): Promise<Record<string, string>> {
   const res = await fetch(`${BASE_URL}/`, {
     method: "GET",
@@ -46,13 +82,16 @@ async function fetchSessionCookies(): Promise<Record<string, string>> {
     },
   });
 
-  const cookies: Record<string, string> = {};
-  const setCookie = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
-  for (const c of setCookie) {
-    const [kv] = c.split(";");
-    const [k, v] = kv.split("=");
-    if (k && v) cookies[k.trim()] = v.trim();
+  if (!res.ok) {
+    throw new Error(`Yargıtay session hatası: ${res.status} ${res.statusText}`);
   }
+
+  const cookies = extractCookies(res);
+
+  if (Object.keys(cookies).length === 0) {
+    throw new Error("Yargıtay session cookie'si alınamadı.");
+  }
+
   return cookies;
 }
 
@@ -75,22 +114,49 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * fetch wrapper: 429 rate-limit için exponential backoff,
+ * geçici 5xx ve network hataları için retry desteği.
+ */
 async function fetchWithRetry(
   url: string,
   init: RequestInit,
   retries = 3,
   baseDelay = 1500
 ): Promise<Response> {
+  let lastError: Error | null = null;
+
   for (let i = 0; i <= retries; i++) {
-    const res = await fetch(url, init);
-    if (res.status === 429 && i < retries) {
-      const delay = baseDelay * Math.pow(2, i);
-      await sleep(delay);
-      continue;
+    try {
+      const res = await fetch(url, init);
+
+      // Rate limit
+      if (res.status === 429 && i < retries) {
+        const delay = baseDelay * Math.pow(2, i);
+        await sleep(delay);
+        continue;
+      }
+
+      // Geçici server hataları (502, 503, 504) için retry
+      if (res.status >= 502 && res.status <= 504 && i < retries) {
+        const delay = baseDelay * Math.pow(2, i);
+        await sleep(delay);
+        continue;
+      }
+
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      // Network hatalarında retry
+      if (i < retries) {
+        const delay = baseDelay * Math.pow(2, i);
+        await sleep(delay);
+        continue;
+      }
     }
-    return res;
   }
-  throw new Error("Max retries exceeded for 429");
+
+  throw lastError || new Error("Max retries exceeded");
 }
 
 function normalizeDecisions(rawItems: any[]): YargitayDecision[] {

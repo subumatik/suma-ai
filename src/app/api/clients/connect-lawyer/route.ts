@@ -33,15 +33,36 @@ export async function POST(req: Request) {
     }
 
     // Check if already connected via any dosya
-    const { data: existing } = await supabase
-      .from('dosyalar')
+    const { data: existingLink } = await supabase
+      .from('dosya_lawyers')
+      .select('dosya_id, dosya:dosya_id!inner(id)')
+      .eq('lawyer_id', lawyer.id);
+
+    const existingDosyaIds = (existingLink ?? []).map((l: any) => l.dosya_id);
+    if (existingDosyaIds.length > 0) {
+      const { data: alreadyConnected } = await supabase
+        .from('dosya_clients')
+        .select('dosya_id')
+        .eq('client_id', user.id)
+        .in('dosya_id', existingDosyaIds)
+        .maybeSingle();
+      if (alreadyConnected) {
+        return NextResponse.json({ error: 'Bu avukat zaten bağlı' }, { status: 400 });
+      }
+    }
+
+    // Get default status
+    const { data: defaultStatus } = await supabase
+      .from('statuses')
       .select('id')
-      .eq('lawyer_id', lawyer.id)
-      .eq('client_id', user.id)
+      .or(`is_system.eq.true,created_by.eq.${lawyer.id}`)
+      .order('is_default', { ascending: false })
+      .order('order', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
-    if (existing) {
-      return NextResponse.json({ error: 'Bu avukat zaten bağlı' }, { status: 400 });
+    if (!defaultStatus?.id) {
+      return NextResponse.json({ error: 'Varsayılan dosya durumu bulunamadı' }, { status: 500 });
     }
 
     // Create a minimal dosya to establish the connection
@@ -49,14 +70,20 @@ export async function POST(req: Request) {
       .from('dosyalar')
       .insert({
         title: 'Genel Danışmanlık',
-        lawyer_id: lawyer.id,
-        client_id: user.id,
+        status_id: defaultStatus.id,
       })
       .select()
       .single();
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (insertError || !dosya) {
+      return NextResponse.json({ error: insertError?.message ?? 'Dosya oluşturulamadı' }, { status: 500 });
+    }
+
+    const { error: lawyerLinkError } = await supabase.from('dosya_lawyers').insert({ dosya_id: dosya.id, lawyer_id: lawyer.id });
+    const { error: clientLinkError } = await supabase.from('dosya_clients').insert({ dosya_id: dosya.id, client_id: user.id });
+    if (lawyerLinkError || clientLinkError) {
+      await supabase.from('dosyalar').delete().eq('id', dosya.id);
+      return NextResponse.json({ error: 'Bağlantı kurulamadı' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, lawyer, dosya });
