@@ -101,9 +101,9 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
             <Card
               sx={{
                 borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+                boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.06)',
                 transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' },
+                '&:hover': { transform: 'translateY(-3px)', boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 8px 30px rgba(0,0,0,0.4)' : '0 8px 30px rgba(0,0,0,0.1)' },
               }}
             >
               <CardContent sx={{ p: 3 }}>
@@ -129,7 +129,7 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
       {/* Lists */}
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, lg: 7 }}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', height: '100%' }}>
+          <Card sx={{ borderRadius: 3, boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.06)', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
@@ -159,7 +159,7 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
                         borderColor: 'divider',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' },
+                        '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
                       }}
                       onClick={() => router.push(`/cases/${d.id}`)}
                     >
@@ -203,7 +203,7 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
         </Grid>
 
         <Grid size={{ xs: 12, lg: 5 }}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', height: '100%' }}>
+          <Card sx={{ borderRadius: 3, boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.06)', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
@@ -308,7 +308,7 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
       {/* Charts */}
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+          <Card sx={{ borderRadius: 3, boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.06)' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Kategori Dağılımı</Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
@@ -340,7 +340,7 @@ export default function DashboardClient({ role, profile, dosyalar, appointments,
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+          <Card sx={{ borderRadius: 3, boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.06)' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Durum Dağılımı</Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>

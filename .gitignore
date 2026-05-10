@@ -29,3 +29,6 @@ yarn-error.log*
 *.tsbuildinfo
 
 /src/generated/prisma
+
+# Supabase CLI cache
+supabase/.temp/

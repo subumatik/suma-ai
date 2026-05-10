@@ -73,6 +73,7 @@ export default function CasesClient({ dosyalar, role, userId, categories, status
       court_file_no: newDosya.court_file_no || null,
       category_id: newDosya.category_id || null,
       status_id: newDosya.status_id,
+      created_by: userId,
     }).select('id').single();
 
     if (createErr || !created) {

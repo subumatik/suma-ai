@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { EventCalendar, eventCalendarClasses } from '@mui/x-scheduler';
@@ -9,7 +9,7 @@ import {
   Box, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Typography, Chip, Snackbar, Alert, Paper, Stack,
   Card, CardContent, ToggleButton, ToggleButtonGroup,
-  IconButton, Divider, useMediaQuery, useTheme,
+  IconButton, Divider, useMediaQuery, useTheme, Switch, FormControlLabel,
 } from '@mui/material';
 import { Add, Gavel, Schedule as ScheduleIcon, ChevronLeft, ChevronRight, ViewList, CalendarMonth } from '@mui/icons-material';
 
@@ -47,6 +47,9 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
   const initialLawyerId = lawyers.find((l) => l.id === urlLawyerId) ? urlLawyerId : (lawyers[0]?.id ?? '');
 
   const [events, setEvents] = useState<any[]>([]);
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
+
   const [mobileView, setMobileView] = useState<'list' | 'calendar'>('list');
 
   useEffect(() => {
@@ -77,6 +80,14 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
     ]);
   }, [appointments, hearings]);
 
+  // Hide MUI X Scheduler built-in event dialog globally (it renders via portal)
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = '.MuiEventCalendar-eventDialog { display: none !important; }';
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
   const [visibleDate, setVisibleDate] = useState(new Date());
   const [view, setView] = useState<'day' | 'week' | 'month' | 'agenda'>(isMobile ? 'day' : 'week');
 
@@ -91,6 +102,46 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
     duration_minutes: 60,
     appointment_date: '',
   });
+  const [sendEmailOnUpdate, setSendEmailOnUpdate] = useState(true);
+
+  // Drag/drop confirmation dialog state
+  const [openDragConfirm, setOpenDragConfirm] = useState(false);
+  const [sendEmailOnDrag, setSendEmailOnDrag] = useState(true);
+  const [pendingDragUpdate, setPendingDragUpdate] = useState<{
+    id: string;
+    oldStart: string;
+    oldEnd: string;
+    newStart: string;
+    newEnd: string;
+    duration: number;
+    topic: string;
+    notes: string;
+  } | null>(null);
+
+  // Initialize form when editing an existing appointment
+  useEffect(() => {
+    if (selectedEvent && !selectedEvent.hearing_date) {
+      setNewAppt({
+        lawyer_id: selectedEvent.lawyer_id || (role === 'lawyer' ? userId : initialLawyerId),
+        client_id: selectedEvent.client_id || '',
+        topic: selectedEvent.topic || '',
+        notes: selectedEvent.notes || '',
+        duration_minutes: selectedEvent.duration_minutes || 60,
+        appointment_date: selectedEvent.appointment_date
+          ? new Date(selectedEvent.appointment_date).toISOString().slice(0, 16)
+          : '',
+      });
+    } else if (!selectedEvent) {
+      setNewAppt({
+        lawyer_id: role === 'lawyer' ? userId : initialLawyerId,
+        client_id: '',
+        topic: '',
+        notes: '',
+        duration_minutes: 60,
+        appointment_date: '',
+      });
+    }
+  }, [selectedEvent, role, userId, initialLawyerId]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
@@ -149,7 +200,7 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
       const titleEl = eventEl.querySelector(`.${eventCalendarClasses.timeGridEventTitle}`) || eventEl.querySelector(`.${eventCalendarClasses.dayGridEventTitle}`);
       const title = titleEl?.textContent?.trim();
       if (title) {
-        const event = events.find((ev) => ev.title === title);
+        const event = eventsRef.current.find((ev) => ev.title === title);
         if (event) {
           handleEventClick(event);
           return;
@@ -176,10 +227,20 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
         }
       }
     }
-  }, [events, handleEventClick, handleCreateFromSlot, visibleDate]);
+  }, [handleEventClick, handleCreateFromSlot, visibleDate]);
 
   const handleEventsChange = useCallback((value: any[]) => {
-    const oldIds = new Set(events.map((e) => e.id));
+    // Always sync scheduler changes into local state (preserve custom fields like type, description)
+    setEvents((prev) => {
+      const prevMap = new Map(prev.map((e) => [e.id, e]));
+      return value.map((v) => {
+        const old = prevMap.get(v.id);
+        return old ? { ...old, ...v } : v;
+      });
+    });
+
+    const currentEvents = eventsRef.current;
+    const oldIds = new Set(currentEvents.map((e) => e.id));
     const newEvent = value.find((e) => !oldIds.has(e.id));
     if (newEvent) {
       const start = new Date(newEvent.start);
@@ -190,19 +251,44 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
     }
 
     const updatedEvent = value.find((v) => {
-      const old = events.find((e) => e.id === v.id);
-      return old && old.type !== 'hearing' && (old.start !== v.start || old.end !== v.end);
+      const old = currentEvents.find((e) => e.id === v.id);
+      return old && old.type !== 'hearing' && (
+        new Date(old.start).getTime() !== new Date(v.start).getTime() ||
+        new Date(old.end).getTime() !== new Date(v.end).getTime() ||
+        old.title !== v.title ||
+        old.description !== v.description
+      );
     });
     if (updatedEvent) {
       const appt = appointments.find((a) => a.id === updatedEvent.id);
       if (appt) {
         const duration = Math.round((new Date(updatedEvent.end).getTime() - new Date(updatedEvent.start).getTime()) / 60000);
-        updateAppointmentDate(appt.id, updatedEvent.start, duration);
+        const startChanged = new Date(appt.appointment_date).getTime() !== new Date(updatedEvent.start).getTime() || appt.duration_minutes !== duration;
+        const metaChanged = (updatedEvent.title && appt.topic !== updatedEvent.title) || (updatedEvent.description && appt.notes !== updatedEvent.description);
+        if (startChanged) {
+          setPendingDragUpdate({
+            id: appt.id,
+            oldStart: appt.appointment_date,
+            oldEnd: new Date(new Date(appt.appointment_date).getTime() + (appt.duration_minutes || 60) * 60000).toISOString(),
+            newStart: updatedEvent.start,
+            newEnd: updatedEvent.end,
+            duration,
+            topic: updatedEvent.title || appt.topic,
+            notes: updatedEvent.description || appt.notes,
+          });
+          setOpenDragConfirm(true);
+        } else if (metaChanged) {
+          supabase.from('appointments').update({
+            topic: updatedEvent.title || appt.topic,
+            notes: updatedEvent.description || appt.notes,
+          }).eq('id', appt.id);
+          showToast('Randevu güncellendi.');
+        }
       }
     }
-  }, [events, appointments, handleCreateFromSlot]);
+  }, [appointments, handleCreateFromSlot]);
 
-  const updateAppointmentDate = async (id: string, startIso: string, duration: number) => {
+  const updateAppointmentDate = async (id: string, startIso: string, duration: number, sendEmail = false) => {
     try {
       await fetch('/api/appointments/status', {
         method: 'POST',
@@ -210,15 +296,23 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
         body: JSON.stringify({ appointment_id: id, status: 'CONFIRMED' }),
       });
       await supabase.from('appointments').update({ appointment_date: startIso, duration_minutes: duration }).eq('id', id);
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === id
-            ? { ...e, start: startIso, end: new Date(new Date(startIso).getTime() + duration * 60000).toISOString() }
-            : e
-        )
-      );
-      showToast('Randevu güncellendi.');
-      router.refresh();
+      if (sendEmail) {
+        await fetch('/api/appointments/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appointment_id: id,
+            appointment_date: startIso,
+            duration_minutes: duration,
+            topic: pendingDragUpdate?.topic || '',
+            notes: pendingDragUpdate?.notes || '',
+            sendEmail: true,
+          }),
+        });
+        showToast('Randevu güncellendi ve bilgilendirme e-postası gönderildi.');
+      } else {
+        showToast('Randevu güncellendi.');
+      }
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -285,6 +379,52 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
         },
       ]);
       setNewAppt({ lawyer_id: role === 'lawyer' ? userId : '', client_id: '', topic: '', notes: '', duration_minutes: 60, appointment_date: '' });
+      router.refresh();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedEvent || selectedEvent.hearing_date) return;
+    if (!newAppt.topic || !newAppt.appointment_date) {
+      showToast('Lütfen tüm zorunlu alanları doldurun.', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      const appointmentDate = new Date(newAppt.appointment_date).toISOString();
+      const res = await fetch('/api/appointments/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointment_id: selectedEvent.id,
+          appointment_date: appointmentDate,
+          duration_minutes: newAppt.duration_minutes,
+          topic: newAppt.topic,
+          notes: newAppt.notes,
+          sendEmail: sendEmailOnUpdate,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Güncelleme başarısız');
+      showToast(sendEmailOnUpdate ? 'Randevu güncellendi ve bilgilendirme e-postası gönderildi.' : 'Randevu güncellendi.');
+      setOpenDialog(false);
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === selectedEvent.id
+            ? {
+                ...e,
+                start: appointmentDate,
+                end: new Date(new Date(appointmentDate).getTime() + newAppt.duration_minutes * 60000).toISOString(),
+                title: newAppt.topic,
+                description: newAppt.notes,
+              }
+            : e
+        )
+      );
       router.refresh();
     } catch (err: any) {
       showToast(err.message, 'error');
@@ -554,10 +694,11 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
         maxWidth="sm"
         fullWidth
         fullScreen={isMobile}
+        disableRestoreFocus
       >
         <DialogTitle>
           {selectedEvent
-            ? (selectedEvent.hearing_date ? 'Duruşma Detayı' : (selectedEvent.topic || 'Randevu Detayı'))
+            ? (selectedEvent.hearing_date ? 'Duruşma Detayı' : (role === 'lawyer' ? 'Randevu Düzenle' : 'Randevu Detayı'))
             : (role === 'lawyer' ? 'Yeni Randevu Oluştur' : 'Yeni Randevu Talebi')}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'auto' }}>
@@ -582,7 +723,41 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
                   <strong>Dosya:</strong> {selectedEvent.dosya?.title || '-'}
                 </Typography>
               </>
+            ) : role === 'lawyer' ? (
+              // Edit form for lawyers
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Chip label={statusConfig[selectedEvent.status]?.label || selectedEvent.status} color={statusConfig[selectedEvent.status]?.color || 'default'} />
+                </Box>
+                <TextField label="Konu" fullWidth value={newAppt.topic} onChange={(e) => setNewAppt({ ...newAppt, topic: e.target.value })} />
+                <TextField
+                  label="Tarih ve Saat"
+                  type="datetime-local"
+                  fullWidth
+                  value={newAppt.appointment_date}
+                  onChange={(e) => setNewAppt({ ...newAppt, appointment_date: e.target.value })}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+                <TextField label="Süre (dk)" type="number" fullWidth value={newAppt.duration_minutes} onChange={(e) => setNewAppt({ ...newAppt, duration_minutes: parseInt(e.target.value) || 60 })} />
+                <TextField label="Notlar" fullWidth multiline rows={3} value={newAppt.notes} onChange={(e) => setNewAppt({ ...newAppt, notes: e.target.value })} />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={sendEmailOnUpdate}
+                      onChange={(e) => setSendEmailOnUpdate(e.target.checked)}
+                    />
+                  }
+                  label="İlgili kişilere e-posta gönder"
+                />
+                {selectedEvent.status === 'REQUESTED' && (
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
+                    <Button fullWidth variant="contained" color="success" onClick={() => handleStatus(selectedEvent.id, 'CONFIRMED')}>Onayla</Button>
+                    <Button fullWidth variant="outlined" color="error" onClick={() => handleStatus(selectedEvent.id, 'CANCELLED')}>Reddet</Button>
+                  </Stack>
+                )}
+              </>
             ) : (
+              // Read-only view for clients
               <>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                   <Chip label={statusConfig[selectedEvent.status]?.label || selectedEvent.status} color={statusConfig[selectedEvent.status]?.color || 'default'} />
@@ -597,12 +772,6 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
                   <Typography variant="body2" sx={{ color: 'text.secondary', wordBreak: 'break-word' }}>
                     <strong>Notlar:</strong> {selectedEvent.notes}
                   </Typography>
-                )}
-                {role === 'lawyer' && selectedEvent.status === 'REQUESTED' && (
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
-                    <Button fullWidth variant="contained" color="success" onClick={() => handleStatus(selectedEvent.id, 'CONFIRMED')}>Onayla</Button>
-                    <Button fullWidth variant="outlined" color="error" onClick={() => handleStatus(selectedEvent.id, 'CANCELLED')}>Reddet</Button>
-                  </Stack>
                 )}
               </>
             )
@@ -648,11 +817,61 @@ export default function AppointmentsClient({ appointments, role, userId, lawyers
         </DialogContent>
         <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, '& > button': { width: { xs: '100%', sm: 'auto' } } }}>
           <Button onClick={() => setOpenDialog(false)}>Kapat</Button>
+          {selectedEvent && !selectedEvent.hearing_date && role === 'lawyer' && (
+            <Button variant="contained" onClick={handleUpdate} disabled={loading || !newAppt.topic || !newAppt.appointment_date}>
+              Kaydet
+            </Button>
+          )}
           {!selectedEvent && (
             <Button variant="contained" onClick={handleCreate} disabled={loading || (role === 'client' ? !newAppt.lawyer_id : !newAppt.client_id) || !newAppt.topic || !newAppt.appointment_date}>
               {role === 'lawyer' ? 'Oluştur' : 'Talep Gönder'}
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Drag/Drop Confirm Dialog */}
+      <Dialog open={openDragConfirm} onClose={() => { setOpenDragConfirm(false); setPendingDragUpdate(null); }} maxWidth="xs" fullWidth>
+        <DialogTitle>Randevu Saati Değişti</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Randevu yeni tarihe taşındı. Değişikliği kaydetmek istiyor musunuz?
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={sendEmailOnDrag}
+                onChange={(e) => setSendEmailOnDrag(e.target.checked)}
+              />
+            }
+            label="İlgili kişilere e-posta gönder"
+          />
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, '& > button': { width: { xs: '100%', sm: 'auto' } } }}>
+          <Button onClick={() => {
+            setOpenDragConfirm(false);
+            if (pendingDragUpdate) {
+              setEvents((prev) =>
+                prev.map((e) =>
+                  e.id === pendingDragUpdate.id
+                    ? { ...e, start: pendingDragUpdate.oldStart, end: pendingDragUpdate.oldEnd }
+                    : e
+                )
+              );
+            }
+            setPendingDragUpdate(null);
+          }}>
+            İptal
+          </Button>
+          <Button variant="contained" onClick={() => {
+            setOpenDragConfirm(false);
+            if (pendingDragUpdate) {
+              updateAppointmentDate(pendingDragUpdate.id, pendingDragUpdate.newStart, pendingDragUpdate.duration, sendEmailOnDrag);
+            }
+            setPendingDragUpdate(null);
+          }}>
+            Kaydet
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -94,7 +94,8 @@ export default function CategoriesClient({ categories, userId }: CategoriesClien
                 onClick={() => setNewCat({ ...newCat, color })}
                 sx={{
                   width: 32, height: 32, borderRadius: '50%', bgcolor: color, cursor: 'pointer',
-                  border: newCat.color === color ? '3px solid #fff' : '3px solid transparent',
+                  border: '3px solid',
+                  borderColor: newCat.color === color ? 'background.paper' : 'transparent',
                   boxShadow: newCat.color === color ? `0 0 0 2px ${color}` : 'none',
                 }}
               />

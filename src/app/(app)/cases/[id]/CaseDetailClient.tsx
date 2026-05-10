@@ -445,7 +445,7 @@ export default function CaseDetailClient({
                   ) : (
                     messages.map((m) => (
                       <Box key={m.id} sx={{ alignSelf: m.sender_id === userId ? 'flex-end' : 'flex-start', maxWidth: { xs: '90%', md: '80%' } }}>
-                        <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: m.sender_id === userId ? 'primary.main' : 'action.hover', color: m.sender_id === userId ? '#fff' : 'inherit' }}>
+                        <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: m.sender_id === userId ? 'primary.main' : 'action.hover', color: m.sender_id === userId ? 'primary.contrastText' : 'text.primary' }}>
                           <Typography variant="caption" sx={{ opacity: 0.8, display: 'block', mb: 0.5 }}>{m.sender?.full_name}</Typography>
                           <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{m.content}</Typography>
                         </Paper>
@@ -653,7 +653,7 @@ export default function CaseDetailClient({
                   ) : (
                     messages.map((m) => (
                       <Box key={m.id} sx={{ alignSelf: m.sender_id === userId ? 'flex-end' : 'flex-start', maxWidth: { xs: '90%', md: '80%' } }}>
-                        <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: m.sender_id === userId ? 'primary.main' : 'action.hover', color: m.sender_id === userId ? '#fff' : 'inherit' }}>
+                        <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: m.sender_id === userId ? 'primary.main' : 'action.hover', color: m.sender_id === userId ? 'primary.contrastText' : 'text.primary' }}>
                           <Typography variant="caption" sx={{ opacity: 0.8, display: 'block', mb: 0.5 }}>{m.sender?.full_name}</Typography>
                           <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{m.content}</Typography>
                         </Paper>
@@ -726,7 +726,7 @@ export default function CaseDetailClient({
         </>
       )}
 
-      <Dialog open={openStatusDialog} onClose={() => setOpenStatusDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+      <Dialog open={openStatusDialog} onClose={() => setOpenStatusDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile} disableRestoreFocus>
         <DialogTitle>Durum Güncelle</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'visible' }}>
           <TextField select label="Yeni Durum" fullWidth value={newStatusId} onChange={(e) => setNewStatusId(e.target.value)}
@@ -745,7 +745,7 @@ export default function CaseDetailClient({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openHearingDialog} onClose={() => setOpenHearingDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+      <Dialog open={openHearingDialog} onClose={() => setOpenHearingDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile} disableRestoreFocus>
         <DialogTitle>Yeni Duruşma Ekle</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'visible' }}>
           <TextField
@@ -791,7 +791,7 @@ export default function CaseDetailClient({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!docToRename} onClose={() => setDocToRename(null)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+      <Dialog open={!!docToRename} onClose={() => setDocToRename(null)} maxWidth="sm" fullWidth fullScreen={isMobile} disableRestoreFocus>
         <DialogTitle>Belgeyi Yeniden Adlandır</DialogTitle>
         <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
           <TextField
@@ -809,7 +809,7 @@ export default function CaseDetailClient({
       </Dialog>
 
       {/* Add Lawyer Dialog */}
-      <Dialog open={openAddLawyerDialog} onClose={() => setOpenAddLawyerDialog(false)} maxWidth="xs" fullWidth fullScreen={isMobile}>
+      <Dialog open={openAddLawyerDialog} onClose={() => setOpenAddLawyerDialog(false)} maxWidth="xs" fullWidth fullScreen={isMobile} disableRestoreFocus>
         <DialogTitle>Avukat Ekle</DialogTitle>
         <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
           <TextField
@@ -838,7 +838,7 @@ export default function CaseDetailClient({
       </Dialog>
 
       {/* Add Client Dialog */}
-      <Dialog open={openAddClientDialog} onClose={() => setOpenAddClientDialog(false)} maxWidth="xs" fullWidth fullScreen={isMobile}>
+      <Dialog open={openAddClientDialog} onClose={() => setOpenAddClientDialog(false)} maxWidth="xs" fullWidth fullScreen={isMobile} disableRestoreFocus>
         <DialogTitle>Müvekkil Ekle</DialogTitle>
         <DialogContent sx={{ pt: 2, overflow: 'visible' }}>
           <TextField
@@ -867,7 +867,7 @@ export default function CaseDetailClient({
       </Dialog>
 
       {/* Create Appointment Dialog */}
-      <Dialog open={openAppointmentDialog} onClose={() => setOpenAppointmentDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+      <Dialog open={openAppointmentDialog} onClose={() => setOpenAppointmentDialog(false)} maxWidth="sm" fullWidth fullScreen={isMobile} disableRestoreFocus>
         <DialogTitle>Yeni Randevu Oluştur</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, overflow: 'visible' }}>
           <TextField

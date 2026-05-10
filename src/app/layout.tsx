@@ -14,6 +14,9 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL || 'localhost:3000'}`
+  ),
   title: "Avukatip — Hukuki İşlemlerin Akıllı Yol Arkadaşı",
   description:
     "Randevu, dava takibi, belge yönetimi ve güvenli mesajlaşma — hepsi tek platformda.",

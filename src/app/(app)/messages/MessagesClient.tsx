@@ -484,7 +484,7 @@ export default function MessagesClient({ userId, userName, role, contacts, allUs
                                       borderBottomLeftRadius: isOwn ? 2 : 0,
                                       bgcolor: isOwn ? 'primary.main' : 'background.paper',
                                       color: isOwn ? 'primary.contrastText' : 'text.primary',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                      boxShadow: theme.palette.mode === 'dark' ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.08)',
                                       transition: 'background-color 0.15s',
                                       '&:hover': {
                                         bgcolor: isOwn ? 'primary.dark' : 'action.hover',

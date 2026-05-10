@@ -39,7 +39,7 @@ export default function ClientsClient({ clients, role, referansKodu }: ClientsCl
       </Box>
 
       {role === 'lawyer' && referansKodu && (
-        <Card sx={{ mb: 3, bgcolor: 'primary.50', border: '1px solid', borderColor: 'primary.200' }}>
+        <Card sx={{ mb: 3, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'primary.main' }}>
@@ -56,7 +56,7 @@ export default function ClientsClient({ clients, role, referansKodu }: ClientsCl
                   fontWeight: 700,
                   letterSpacing: 2,
                   color: 'primary.dark',
-                  bgcolor: '#fff',
+                  bgcolor: 'background.paper',
                   px: 2,
                   py: 0.5,
                   borderRadius: 1,

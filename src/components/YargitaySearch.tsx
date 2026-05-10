@@ -171,8 +171,8 @@ export default function YargitaySearch() {
             <Box
               sx={{
                 '& table': { width: '100%', borderCollapse: 'collapse', mb: 2 },
-                '& th, & td': { border: '1px solid #e5e7eb', p: 1, textAlign: 'left' },
-                '& th': { bgcolor: '#f3f4f6' },
+                '& th, & td': { border: '1px solid', borderColor: 'divider', p: 1, textAlign: 'left' },
+                '& th': { bgcolor: 'action.hover' },
               }}
               dangerouslySetInnerHTML={{ __html: detailHtml }}
             />

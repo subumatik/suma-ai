@@ -46,11 +46,42 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 12 },
   components: {
-    MuiCard: { styleOverrides: { root: { borderRadius: 16, border: '1px solid var(--mui-palette-divider)', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', transition: 'box-shadow 0.2s', '&:hover': { boxShadow: '0 8px 32px rgba(0,0,0,0.15)' } } } },
+    MuiCard: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          borderRadius: 16,
+          border: '1px solid var(--mui-palette-divider)',
+          boxShadow: theme.palette.mode === 'dark' ? '0 4px 24px rgba(0,0,0,0.4)' : '0 4px 24px rgba(0,0,0,0.1)',
+          transition: 'box-shadow 0.2s',
+          '&:hover': {
+            boxShadow: theme.palette.mode === 'dark' ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.15)',
+          },
+        }),
+      },
+    },
     MuiButton: { styleOverrides: { root: { borderRadius: 10, textTransform: 'none', fontWeight: 600 } } },
-    MuiTextField: { styleOverrides: { root: { '& .MuiOutlinedInput-root': { borderRadius: 10, backgroundColor: 'rgba(128,128,128,0.04)' } } } },
+    MuiTextField: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 10,
+            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(128,128,128,0.04)',
+          },
+        }),
+      },
+    },
     MuiChip: { styleOverrides: { root: { borderRadius: 8, fontWeight: 500 } } },
-    MuiListItemButton: { styleOverrides: { root: { borderRadius: 10, marginBottom: 2, '&.Mui-selected': { backgroundColor: 'rgba(39,39,42,0.12)' } } } },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          borderRadius: 10,
+          marginBottom: 2,
+          '&.Mui-selected': {
+            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(39,39,42,0.12)',
+          },
+        }),
+      },
+    },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
   },
 });

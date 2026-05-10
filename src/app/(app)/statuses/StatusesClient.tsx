@@ -117,7 +117,8 @@ export default function StatusesClient({ statuses, userId }: StatusesClientProps
                 onClick={() => setNewStatus({ ...newStatus, color })}
                 sx={{
                   width: 32, height: 32, borderRadius: '50%', bgcolor: color, cursor: 'pointer',
-                  border: newStatus.color === color ? '3px solid #fff' : '3px solid transparent',
+                  border: '3px solid',
+                  borderColor: newStatus.color === color ? 'background.paper' : 'transparent',
                   boxShadow: newStatus.color === color ? `0 0 0 2px ${color}` : 'none',
                 }}
               />
